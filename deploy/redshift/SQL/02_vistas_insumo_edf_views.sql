@@ -1,0 +1,191 @@
+-- ============================================================
+-- 00_vistas_insumo_bdm.sql  (DEV / edf_views)
+-- Capa XPM edf_views â†’ insumo BDM para UnificaciÃ³n R1/R2/R3
+-- Diferencia vs ifr_data: sin columna relationalizelastupdate en JOINs
+-- Sanitiza strings vacÃ­os / IDs fuera de rango INTEGER (edf_views DEV)
+-- ============================================================
+
+DROP VIEW IF EXISTS bdm_tempo.v_xpm_ciiu_persona;
+DROP VIEW IF EXISTS bdm_tempo.v_xpm_reporte_relacion_persona_ubica;
+DROP VIEW IF EXISTS bdm_tempo.v_xpm_direccion_fisica;
+DROP VIEW IF EXISTS bdm_tempo.v_xpm_ubicacion_estandarizada;
+DROP VIEW IF EXISTS bdm_tempo.v_xpm_relacion_persona_ubicacion;
+DROP VIEW IF EXISTS bdm_tempo.v_xpm_contacto_direccion;
+
+CREATE OR REPLACE VIEW bdm_tempo.v_xpm_contacto_direccion AS
+SELECT
+  xpm.pin,
+  CAST(NULL AS BIGINT)              AS relationalizelastupdate,
+  loc.id                            AS cod_dw_ubic,
+  ci.id                             AS cod_dw_persona_ubic,
+  ci.id                             AS cod_dw_direccion_fisica,
+  FNV_HASH(xpm.pin)                 AS id_buro_persona,
+  CAST(xpm.pin AS BIGINT)           AS cod_pin_persona,
+  CASE
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '8' THEN 3
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') ~ '^[0-9]+$'
+    THEN CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') AS INTEGER)
+    ELSE NULL
+  END AS cod_dw_tipo_ubicacion_dir,
+  COALESCE(
+    NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedtextoubicacion"::VARCHAR), ''),
+    NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
+    NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '')
+  ) AS texto_ubicacion,
+  COALESCE(
+    NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
+    NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedtextoubicacion"::VARCHAR), ''),
+    NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '')
+  ) AS texto_ubicacion_normalizado,
+  NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '') AS texto_ubicacion_original,
+  CASE
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contactasstandardizedscore"::VARCHAR), '') ~ '^[0-9]+(\.[0-9]+)?$'
+    THEN CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.contactasstandardizedscore"::VARCHAR), '') AS DECIMAL(5,4))
+    ELSE NULL
+  END AS score_estandarizacion,
+  CASE
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') ~ '^[0-9]+$'
+     AND CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') AS BIGINT) <= 2147483647
+    THEN CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') AS INTEGER)
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.cityname"::VARCHAR), '') IS NOT NULL
+    THEN MOD(ABS(FNV_HASH(UPPER(TRIM(ci."location.val.contactinformations.val.cityname"::VARCHAR)))), 99999999)
+    ELSE NULL
+  END AS cod_dw_ciudad,
+  COALESCE(
+    NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddepartment"::VARCHAR), ''),
+    NULLIF(TRIM(ci."location.val.contactinformations.val.statename"::VARCHAR), '')
+  ) AS departamento,
+  COALESCE(
+    NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedmunicipality"::VARCHAR), ''),
+    NULLIF(TRIM(ci."location.val.contactinformations.val.cityname"::VARCHAR), '')
+  ) AS municipio,
+  ci."location.val.contactinformations.val.standardizedtipo"               AS tipo_ubicacion,
+  NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedcomplemento"::VARCHAR), '') AS complemento,
+  ci."location.val.contactinformations.val.standardizedtipoviaprincipal"   AS tipo_via_principal,
+  ci."location.val.contactinformations.val.standardizedviaprincipal"       AS via_principal,
+  ci."location.val.contactinformations.val.standardizedviageneradora"      AS via_generadora,
+  ci."location.val.contactinformations.val.standardizednumeropuerta"       AS numero_puerta,
+  CASE
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacteventlastupdated"::VARCHAR), '') ~ '^[0-9]+$'
+    THEN bdm_datos.convert_epoch_to_date(
+      CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.contacteventlastupdated"::VARCHAR), '') AS BIGINT)
+    )
+    ELSE NULL
+  END AS fecha_relacion_persona_ubicaci,
+  CASE
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contactfirsteventdate"::VARCHAR), '') ~ '^[0-9]+$'
+    THEN bdm_datos.convert_epoch_to_date(
+      CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.contactfirsteventdate"::VARCHAR), '') AS BIGINT)
+    )
+    ELSE NULL
+  END AS fecha_primera_relacion,
+  CAST(NULL AS DECIMAL(10,6)) AS latitud,
+  CAST(NULL AS DECIMAL(10,6)) AS longitud,
+  CASE
+    WHEN NULLIF(TRIM(loc."location.val.personidtype"::VARCHAR), '') ~ '^[0-9]+$'
+    THEN CAST(NULLIF(TRIM(loc."location.val.personidtype"::VARCHAR), '') AS INTEGER)
+    ELSE NULL
+  END AS cod_tipo_ident_fte,
+  CAST(NULL AS INTEGER) AS lote
+FROM ds_dba_rncr_batch.edf_views.xpm xpm
+INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location loc
+  ON xpm.location = loc.id
+INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location_val_contactinformations ci
+  ON loc."location.val.contactinformations" = ci.id
+WHERE NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('1', '2', '3', '7', '8')
+WITH NO SCHEMA BINDING;
+
+CREATE OR REPLACE VIEW bdm_tempo.v_xpm_relacion_persona_ubicacion AS
+SELECT
+  cod_dw_persona_ubic,
+  id_buro_persona,
+  cod_pin_persona,
+  cod_dw_ubic,
+  cod_dw_direccion_fisica,
+  cod_dw_tipo_ubicacion_dir,
+  CAST(NULL AS INTEGER) AS ind_unificacion,
+  ROW_NUMBER() OVER (
+    PARTITION BY id_buro_persona, cod_dw_ubic, cod_dw_tipo_ubicacion_dir
+    ORDER BY fecha_relacion_persona_ubicaci DESC NULLS LAST, cod_dw_persona_ubic
+  ) AS orden_prioridad,
+  fecha_relacion_persona_ubicaci,
+  lote,
+  cod_tipo_ident_fte,
+  CAST(0 AS SMALLINT) AS bloqueado
+FROM bdm_tempo.v_xpm_contacto_direccion
+WITH NO SCHEMA BINDING;
+
+CREATE OR REPLACE VIEW bdm_tempo.v_xpm_ubicacion_estandarizada AS
+SELECT DISTINCT
+  cod_dw_ubic,
+  texto_ubicacion,
+  texto_ubicacion_normalizado,
+  texto_ubicacion_original,
+  score_estandarizacion,
+  cod_dw_ciudad,
+  cod_dw_ciudad AS cod_dw_municipio,
+  departamento,
+  municipio,
+  tipo_ubicacion,
+  cod_dw_tipo_ubicacion_dir AS cod_dw_tipo_ubicacion,
+  latitud,
+  longitud
+FROM bdm_tempo.v_xpm_contacto_direccion
+WITH NO SCHEMA BINDING;
+
+CREATE OR REPLACE VIEW bdm_tempo.v_xpm_direccion_fisica AS
+SELECT DISTINCT
+  cod_dw_direccion_fisica,
+  complemento,
+  tipo_via_principal,
+  via_principal,
+  via_generadora,
+  numero_puerta,
+  cod_dw_ubic,
+  CAST(0 AS INTEGER) AS generada_enriquecida
+FROM bdm_tempo.v_xpm_contacto_direccion
+WITH NO SCHEMA BINDING;
+
+CREATE OR REPLACE VIEW bdm_tempo.v_xpm_reporte_relacion_persona_ubica AS
+SELECT
+  ci.id AS cod_dw_persona_ubic,
+  COALESCE(
+    CASE
+      WHEN NULLIF(TRIM(cp."counterparties.val.counterpartyidnumber"::VARCHAR), '') ~ '^[0-9]+$'
+       AND CAST(NULLIF(TRIM(cp."counterparties.val.counterpartyidnumber"::VARCHAR), '') AS BIGINT) <= 2147483647
+      THEN CAST(NULLIF(TRIM(cp."counterparties.val.counterpartyidnumber"::VARCHAR), '') AS INTEGER)
+      ELSE NULL
+    END,
+    CASE
+      WHEN NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') ~ '^[0-9]+$'
+       AND CAST(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') AS BIGINT) <= 2147483647
+      THEN CAST(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') AS INTEGER)
+      ELSE NULL
+    END,
+    MOD(ABS(FNV_HASH(xpm.pin || ':' || ci.id::VARCHAR)), 9998) + 1
+  ) AS id_buro_suscriptor,
+  CASE
+    WHEN NULLIF(TRIM(loc."location.val.cutoffdate"::VARCHAR), '') ~ '^[0-9]+$'
+    THEN bdm_datos.convert_epoch_to_date(
+      CAST(NULLIF(TRIM(loc."location.val.cutoffdate"::VARCHAR), '') AS BIGINT)
+    )
+    ELSE CURRENT_DATE
+  END AS fecha_reporte
+FROM ds_dba_rncr_batch.edf_views.xpm xpm
+INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location loc
+  ON xpm.location = loc.id
+INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location_val_contactinformations ci
+  ON loc."location.val.contactinformations" = ci.id
+LEFT JOIN ds_dba_rncr_batch.edf_views.xpm_counterparties cp
+  ON xpm.counterparties = cp.id
+WHERE NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('1', '2', '3', '7', '8')
+WITH NO SCHEMA BINDING;
+
+CREATE OR REPLACE VIEW bdm_tempo.v_xpm_ciiu_persona AS
+SELECT DISTINCT
+  FNV_HASH(xpm.pin) AS id_buro_persona,
+  NULLIF(TRIM(xpm."bestpersonalinformation.mainisiccodeforproduct"::VARCHAR), '') AS cod_act_econo_ciiu_fte
+FROM ds_dba_rncr_batch.edf_views.xpm xpm
+WHERE NULLIF(TRIM(xpm."bestpersonalinformation.mainisiccodeforproduct"::VARCHAR), '') IS NOT NULL
+WITH NO SCHEMA BINDING;
+

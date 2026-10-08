@@ -1,0 +1,15 @@
+00_prerequisitos_schemas.sql
+01_ddl_unificacion_direccion.sql
+01b_ddl_unificacion_direccion_mock.sql
+02a_ddl_bdm_stage_insumo_mock.sql
+02_vistas_insumo_edf_views.sql
+02b_vistas_insumo_mock.sql
+03_ddl_geo.sql
+11_ddl_unif_control.sql
+01_ddl_ordenamiento.sql
+02_catalogos_ordenamiento.sql
+02_carga_betas_ritm5226589.sql
+03_vistas_contacto_canal_edf_views.sql
+04_vistas_insumo_ordenamiento_edf_views.sql
+05_ddl_ordenamiento_mock.sql
+12_ddl_ord_control.sql

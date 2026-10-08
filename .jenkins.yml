@@ -1,0 +1,9 @@
+# DATABASE-REDSHIFT - Unificacion+Ordenamiento STRCT (tablas / catalogo / vistas)
+version: 1.0.0
+global:
+  application: dba_rncr_batch
+  type: struct
+  tech: database
+  language: redshift
+  jdk: 8
+  order: 1
