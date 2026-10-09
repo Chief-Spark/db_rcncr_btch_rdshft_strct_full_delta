@@ -113,12 +113,15 @@ CREATE TABLE IF NOT EXISTS bdm_datos.rpu_generada (
   fecha_relacion_persona_ubicaci DATE,
   lote                           INTEGER,
   lote_actualizacion             INTEGER,
-  -- VARCHAR(20) como el CAST(NULL AS VARCHAR(20)) del legado (linea 1677 de
-  -- PRO_UnificacionR2.sql), y el motor siempre escribe NULL aqui. OJO: en la
-  -- via REAL el datashare expone cod_tipo_ident_fte como INTEGER, asi que
-  -- v_xpm_relacion_persona_ubicacion lo castea a INTEGER al unir las dos ramas.
-  -- El cast no puede fallar porque el valor es NULL; si alguna vez se escribe
-  -- algo aqui, tiene que ser numerico.
+  -- VARCHAR(20) como el CAST(NULL AS VARCHAR(20)) del legado (lineas 1677,
+  -- 1699, 1723, 3505 y 3527 de PRO_UnificacionR2.sql), y el motor siempre
+  -- escribe NULL aqui.
+  -- Antes este comentario decia que v_xpm_relacion_persona_ubicacion castea la
+  -- columna a INTEGER y que el cast "no puede fallar porque el valor es NULL".
+  -- Lo segundo solo valia para ESTA rama de la union; la otra rama lee
+  -- personidtype del datashare, con valores reales, y por ahi aborto el job
+  -- #293 con "Value out of range for 4 bytes". La vista ya expone la columna
+  -- como VARCHAR(20) en las dos ramas, igual que el legado y que el mock.
   cod_tipo_ident_fte             VARCHAR(20),
   usuario_bd                     VARCHAR(100),
   fecha_inactivacion             DATE,             -- NULL = vigente

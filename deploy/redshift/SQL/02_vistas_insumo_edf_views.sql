@@ -23,7 +23,12 @@ SELECT
   CAST(xpm.pin AS BIGINT)           AS cod_pin_persona,
   CASE
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '8' THEN 3
+    -- SLCOPRBA-1354: tope de magnitud, como ya lo tenian standardizeddanecode
+    -- y counterpartyidnumber en este mismo archivo. Sin el, un contacttype de
+    -- mas de 10 digitos aborta el lote completo con "Value out of range for 4
+    -- bytes"; con el, esa fila queda con tipo NULL y el lote sigue.
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') ~ '^[0-9]+$'
+     AND CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') AS BIGINT) <= 2147483647
     THEN CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') AS INTEGER)
     ELSE NULL
   END AS cod_dw_tipo_ubicacion_dir,
@@ -81,11 +86,18 @@ SELECT
   END AS fecha_primera_relacion,
   CAST(NULL AS DECIMAL(10,6)) AS latitud,
   CAST(NULL AS DECIMAL(10,6)) AS longitud,
-  CASE
-    WHEN NULLIF(TRIM(loc."location.val.personidtype"::VARCHAR), '') ~ '^[0-9]+$'
-    THEN CAST(NULLIF(TRIM(loc."location.val.personidtype"::VARCHAR), '') AS INTEGER)
-    ELSE NULL
-  END AS cod_tipo_ident_fte,
+  -- SLCOPRBA-1354: VARCHAR(20), NO INTEGER.
+  -- En el legado Cod_Tipo_Ident_Fte es CAST(NULL AS VARCHAR(20)) (lineas 1677,
+  -- 1699, 1723, 3505 y 3527 de PRO_UnificacionR2.sql) y se usa como LLAVE DE
+  -- JOIN contra la tabla de tipos; la prueba de NIT es sobre el nombre
+  -- (Nombre_Tipo_Ident LIKE '%Nit%'), nunca sobre un numero.
+  -- Castearlo a INTEGER rompia de dos maneras: un personidtype de mas de 10
+  -- digitos aborta con "Value out of range for 4 bytes" (asi cayo el job #293,
+  -- porque el guardia solo exigia que fueran digitos, no que cupieran en 4
+  -- bytes), y dejaba el tipo de la via real divergente del mock, que ya lo
+  -- trae VARCHAR(20) igual que bdm_datos.rpu_generada.
+  CAST(NULLIF(TRIM(loc."location.val.personidtype"::VARCHAR), '') AS VARCHAR(20))
+    AS cod_tipo_ident_fte,
   CAST(NULL AS INTEGER) AS lote
 FROM ds_dba_rncr_batch.edf_views.xpm xpm
 INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location loc
@@ -179,7 +191,7 @@ FROM (
     CAST(NULL                           AS INTEGER)  AS ind_unificacion,
     CAST(fecha_relacion_persona_ubicaci AS DATE)     AS fecha_relacion_persona_ubicaci,
     CAST(lote                           AS INTEGER)  AS lote,
-    CAST(cod_tipo_ident_fte             AS INTEGER)  AS cod_tipo_ident_fte,
+    CAST(cod_tipo_ident_fte          AS VARCHAR(20)) AS cod_tipo_ident_fte,
     CAST(0                              AS SMALLINT) AS bloqueado
   FROM bdm_tempo.v_xpm_contacto_direccion
   UNION ALL
@@ -193,7 +205,7 @@ FROM (
     CAST(ind_unificacion                AS INTEGER),
     CAST(fecha_relacion_persona_ubicaci AS DATE),
     CAST(lote                           AS INTEGER),
-    CAST(cod_tipo_ident_fte             AS INTEGER),
+    CAST(cod_tipo_ident_fte          AS VARCHAR(20)),
     CAST(0                              AS SMALLINT)
   FROM bdm_datos.rpu_generada
   WHERE fecha_inactivacion IS NULL
