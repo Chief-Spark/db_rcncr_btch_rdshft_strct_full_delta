@@ -113,6 +113,12 @@ CREATE TABLE IF NOT EXISTS bdm_datos.rpu_generada (
   fecha_relacion_persona_ubicaci DATE,
   lote                           INTEGER,
   lote_actualizacion             INTEGER,
+  -- VARCHAR(20) como el CAST(NULL AS VARCHAR(20)) del legado (linea 1677 de
+  -- PRO_UnificacionR2.sql), y el motor siempre escribe NULL aqui. OJO: en la
+  -- via REAL el datashare expone cod_tipo_ident_fte como INTEGER, asi que
+  -- v_xpm_relacion_persona_ubicacion lo castea a INTEGER al unir las dos ramas.
+  -- El cast no puede fallar porque el valor es NULL; si alguna vez se escribe
+  -- algo aqui, tiene que ser numerico.
   cod_tipo_ident_fte             VARCHAR(20),
   usuario_bd                     VARCHAR(100),
   fecha_inactivacion             DATE,             -- NULL = vigente

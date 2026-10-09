@@ -157,20 +157,44 @@ SELECT
   rpu_u.cod_tipo_ident_fte,
   rpu_u.bloqueado
 FROM (
+  -- SLCOPRBA-1354: CAST EXPLICITO EN LAS DOS RAMAS.
+  -- Antes de M2 esta vista NO tenia UNION: leia una sola fuente, asi que
+  -- ninguna columna estaba pareada contra nada y los tipos no importaban. Al
+  -- introducir el UNION ALL hay que garantizar que cada par case, y el riesgo
+  -- NO lo avisa el despliegue: la vista es WITH NO SCHEMA BINDING, de modo que
+  -- Redshift la crea sin validar y el error aparece recien cuando alguien la
+  -- CONSULTA ("UNION types integer and character varying cannot be matched",
+  -- que es como se cayo el job #279 en 04_vistas_insumo_ordenamiento).
+  -- Casteando ambas ramas la union no puede romperse por tipos, y los tipos de
+  -- salida de la vista quedan fijos y documentados.
+  -- Los VARCHAR no se castean a proposito: Redshift ensancha solo al unir dos
+  -- VARCHAR de distinto largo, y castear a lo ancho fijo arriesgaria truncar.
   SELECT
-    cod_dw_persona_ubic, id_buro_persona, cod_pin_persona, cod_dw_ubic,
-    cod_dw_direccion_fisica, cod_dw_tipo_ubicacion_dir,
-    CAST(NULL AS INTEGER) AS ind_unificacion,
-    fecha_relacion_persona_ubicaci, lote, cod_tipo_ident_fte,
-    CAST(0 AS SMALLINT)   AS bloqueado
+    CAST(cod_dw_persona_ubic            AS BIGINT)   AS cod_dw_persona_ubic,
+    CAST(id_buro_persona                AS BIGINT)   AS id_buro_persona,
+    CAST(cod_pin_persona                AS BIGINT)   AS cod_pin_persona,
+    CAST(cod_dw_ubic                    AS BIGINT)   AS cod_dw_ubic,
+    CAST(cod_dw_direccion_fisica        AS BIGINT)   AS cod_dw_direccion_fisica,
+    CAST(cod_dw_tipo_ubicacion_dir      AS INTEGER)  AS cod_dw_tipo_ubicacion_dir,
+    CAST(NULL                           AS INTEGER)  AS ind_unificacion,
+    CAST(fecha_relacion_persona_ubicaci AS DATE)     AS fecha_relacion_persona_ubicaci,
+    CAST(lote                           AS INTEGER)  AS lote,
+    CAST(cod_tipo_ident_fte             AS INTEGER)  AS cod_tipo_ident_fte,
+    CAST(0                              AS SMALLINT) AS bloqueado
   FROM bdm_tempo.v_xpm_contacto_direccion
   UNION ALL
   SELECT
-    cod_dw_persona_ubic, id_buro_persona, cod_pin_persona, cod_dw_ubic,
-    cod_dw_direccion_fisica, cod_dw_tipo_ubicacion_dir,
-    ind_unificacion,
-    fecha_relacion_persona_ubicaci, lote, cod_tipo_ident_fte,
-    CAST(0 AS SMALLINT)   AS bloqueado
+    CAST(cod_dw_persona_ubic            AS BIGINT),
+    CAST(id_buro_persona                AS BIGINT),
+    CAST(cod_pin_persona                AS BIGINT),
+    CAST(cod_dw_ubic                    AS BIGINT),
+    CAST(cod_dw_direccion_fisica        AS BIGINT),
+    CAST(cod_dw_tipo_ubicacion_dir      AS INTEGER),
+    CAST(ind_unificacion                AS INTEGER),
+    CAST(fecha_relacion_persona_ubicaci AS DATE),
+    CAST(lote                           AS INTEGER),
+    CAST(cod_tipo_ident_fte             AS INTEGER),
+    CAST(0                              AS SMALLINT)
   FROM bdm_datos.rpu_generada
   WHERE fecha_inactivacion IS NULL
 ) rpu_u
@@ -219,16 +243,25 @@ SELECT DISTINCT
   cod_dw_ubic,
   generada_enriquecida
 FROM (
+  -- SLCOPRBA-1354: CAST EXPLICITO de las columnas NUMERICAS en las dos ramas,
+  -- por la misma razon que en la vista de relacion_persona_ubicacion: la vista
+  -- es WITH NO SCHEMA BINDING y un desajuste de tipos en el UNION no se detecta
+  -- al desplegar, solo al consultarla. Los VARCHAR se dejan sin castear: al unir
+  -- dos VARCHAR Redshift ensancha solo, y fijar un ancho arriesgaria truncar.
   SELECT
-    cod_dw_direccion_fisica, complemento, tipo_via_principal, via_principal,
-    via_generadora, numero_puerta, cod_dw_ubic,
-    CAST(0 AS INTEGER) AS generada_enriquecida
+    CAST(cod_dw_direccion_fisica AS BIGINT)  AS cod_dw_direccion_fisica,
+    complemento, tipo_via_principal, via_principal,
+    via_generadora, numero_puerta,
+    CAST(cod_dw_ubic             AS BIGINT)  AS cod_dw_ubic,
+    CAST(0                       AS INTEGER) AS generada_enriquecida
   FROM bdm_tempo.v_xpm_contacto_direccion
   UNION ALL
   SELECT
-    cod_dw_direccion_fisica, complemento, tipo_via_principal, via_principal,
-    via_generadora, numero_puerta, cod_dw_ubic,
-    COALESCE(generada_enriquecida, 1) AS generada_enriquecida
+    CAST(cod_dw_direccion_fisica AS BIGINT),
+    complemento, tipo_via_principal, via_principal,
+    via_generadora, numero_puerta,
+    CAST(cod_dw_ubic             AS BIGINT),
+    CAST(COALESCE(generada_enriquecida, 1) AS INTEGER)
   FROM bdm_datos.direccion_fisica_generada
   WHERE fecha_inactivacion IS NULL
 ) df_u
