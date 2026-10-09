@@ -23,10 +23,20 @@ CREATE TABLE IF NOT EXISTS bdm_stage.relacion_persona_ubicacion (
 DISTSTYLE KEY DISTKEY (id_buro_persona)
 SORTKEY (id_buro_persona, cod_dw_persona_ubic);
 
+-- SLCOPRBA-1354: se anaden municipio y departamento. Los necesitan dos
+-- consumidores: el Insumo_GEO mock (columnas MUNICIPIO / DEPARTAMENTO del
+-- UNLOAD, Req 2.3) y la vista v_mock_contacto_direccion, espejo de
+-- v_xpm_contacto_direccion, que las expone para el Ordenamiento mock.
+-- DROP + CREATE porque CREATE TABLE IF NOT EXISTS no anade columnas a una tabla
+-- ya existente y Redshift no admite ALTER TABLE ADD COLUMN IF NOT EXISTS. Es
+-- una tabla de semillas mock: no hay dato productivo que perder.
+DROP TABLE IF EXISTS bdm_stage.ubicacion_estandarizada;
 CREATE TABLE IF NOT EXISTS bdm_stage.ubicacion_estandarizada (
   cod_dw_ubic       BIGINT,
   texto_ubicacion   VARCHAR(500),
   cod_dw_ciudad     INTEGER,
+  municipio         VARCHAR(100),
+  departamento      VARCHAR(100),
   latitud           DECIMAL(12,8),
   longitud          DECIMAL(12,8)
 )
@@ -77,6 +87,26 @@ CREATE TABLE IF NOT EXISTS bdm_stage.diccionario_complementos (
 )
 DISTSTYLE KEY DISTKEY (id_buro_persona)
 SORTKEY (id_buro_persona, cod_dw_ubic);
+
+-- SLCOPRBA-1355: contactos de canal TEL / CEL / EMA para el Ordenamiento mock.
+-- Espejo de la fuente de bdm_tempo.v_xpm_contacto_canal. Sin esta tabla el
+-- Ordenamiento mock solo podria puntuar el canal DIR y los criterios de
+-- aceptacion que exigen scores en TEL/CEL/EMA no tendrian como cumplirse.
+-- contact_type sigue la codificacion del datashare: '4','5','8' = telefono fijo,
+-- '9' = celular; el resto se interpreta como correo en el insumo EMA.
+CREATE TABLE IF NOT EXISTS bdm_stage.contacto_canal (
+  cod_dw_persona_ubic     BIGINT,
+  id_buro_persona         BIGINT,
+  cod_pin_persona         BIGINT,
+  contact_type            VARCHAR(10),
+  valor_contacto          VARCHAR(200),
+  texto_ubicacion_vinculo VARCHAR(500),
+  cod_dane_ciudad         INTEGER,
+  fecha_contacto          DATE,
+  id_buro_suscriptor      INTEGER
+)
+DISTSTYLE KEY DISTKEY (id_buro_persona)
+SORTKEY (id_buro_persona, contact_type);
 
 -- Catalogo minimo tipos RES/LAB/CRR (ids tipicos de suite mock)
 DELETE FROM bdm_stage.tipo_ubicacion_dir
