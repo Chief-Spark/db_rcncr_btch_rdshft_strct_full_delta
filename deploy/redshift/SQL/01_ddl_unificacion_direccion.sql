@@ -51,9 +51,27 @@ DISTSTYLE KEY
 DISTKEY (cod_dw_persona_ubic)
 SORTKEY (cod_dw_persona_ubic);
 
-CREATE TABLE IF NOT EXISTS bdm_datos.diccionario_complementos (
+-- SLCOPRBA-1354: id_buro_persona pasa de INTEGER a BIGINT.
+-- En la via REAL id_buro_persona es FNV_HASH(xpm.pin) (v_xpm_contacto_direccion),
+-- un hash de 64 bits cuyos valores desbordan los 4 bytes de INTEGER. Insertarlo
+-- aqui abortaba la Regla 2 completa con "Value out of range for 4 bytes": asi
+-- cayeron los jobs #293 y #298, en el constructor del diccionario, el primer
+-- paso de regla2 que escribe id_buro_persona con datos reales.
+-- El mock no lo detectaba porque siembra id_buro_persona entre 9210000 y
+-- 9560999, y bdm_stage.diccionario_complementos ya lo declaraba BIGINT: la
+-- tabla real era la unica estrecha.
+--
+-- Se reemplaza con DROP + CREATE y no con CREATE IF NOT EXISTS: la tabla ya
+-- existe en los ambientes con la columna en INTEGER, y Redshift no permite
+-- ALTER COLUMN de INTEGER a BIGINT. Es seguro recrearla porque es una cache
+-- derivada: sp_unificacion_r2_construir_diccionario_complementos la reconstruye
+-- al inicio de cada regla2 para las personas del alcance, y sus dos unicos
+-- consumidores (esc4 y esc6) la unen siempre por id_buro_persona + cod_dw_ubic
+-- contra ese mismo alcance, de modo que ninguna fila fuera del alcance se lee.
+DROP TABLE IF EXISTS bdm_datos.diccionario_complementos;
+CREATE TABLE bdm_datos.diccionario_complementos (
   cod_dw_ubic BIGINT,
-  id_buro_persona INTEGER,
+  id_buro_persona BIGINT,
   nomenclatura VARCHAR(50),
   nomen VARCHAR(10),
   valor VARCHAR(50),
