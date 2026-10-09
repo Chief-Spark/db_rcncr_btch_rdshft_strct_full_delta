@@ -108,23 +108,54 @@ WITH NO SCHEMA BINDING;
 -- justo lo que la hace util aguas abajo (Ordenamiento).
 -- ind_unificacion sigue llegando como constante NULL desde el datashare, pero
 -- de rpu_generada llega el valor REAL de la tabla.
+-- SLCOPRBA-1354 (M7): ind_unificacion se DERIVA de bdm_datos.unificacion_direccion.
+--
+-- Antes la rama del datashare lo exponia como CAST(NULL AS INTEGER), es decir
+-- "nada esta unificado nunca", y el filtro de estado del insumo
+-- (ind_unificacion IS NULL, el del legado en V_Insumo_Unificacion_Regla1) no
+-- filtraba nada: cada DELTA re-procesaba todo lo ya unificado.
+--
+-- El legado marca el estado con la quinta pasada del TPT
+-- (P0020_UNIFICACION_DIRECCION_130.TPT, lineas 281-292):
+--     UPDATE <RELACION_PERSONA_UBICACION> SET IND_UNIFICACION = 1
+-- sobre las filas que acaba de unificar. En el consumidor no se puede escribir
+-- la tabla del PRODUCTOR -- los objetos de un datashare son de solo lectura --
+-- pero el estado no hace falta almacenarlo: una direccion esta unificada si y
+-- solo si aparece como HIJA en bdm_datos.unificacion_direccion, que es exactamente el
+-- conjunto que el TPT marca. Se deriva, y asi no hay una segunda fuente de
+-- verdad que se pueda desincronizar.
+--
+-- El reset del FULL sale gratis: el orquestador ya trunca bdm_datos.unificacion_direccion
+-- en su paso 6, antes de preparar el insumo, de modo que un FULL ve el estado
+-- vacio y re-procesa todo.
+--
+-- Da 1 o NULL, no 1 o 0: el filtro del insumo es IS NULL, igual que el legado.
+-- DISTINCT en el subquery: la Clave_Unificacion es el PAR
+-- (cod_dw_persona_ubic, cod_dw_direccion_unificada), asi que una misma
+-- direccion puede tener mas de una fila y un join directo DUPLICARIA el insumo.
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_relacion_persona_ubicacion AS
 SELECT
-  cod_dw_persona_ubic,
-  id_buro_persona,
-  cod_pin_persona,
-  cod_dw_ubic,
-  cod_dw_direccion_fisica,
-  cod_dw_tipo_ubicacion_dir,
-  ind_unificacion,
+  rpu_u.cod_dw_persona_ubic,
+  rpu_u.id_buro_persona,
+  rpu_u.cod_pin_persona,
+  rpu_u.cod_dw_ubic,
+  rpu_u.cod_dw_direccion_fisica,
+  rpu_u.cod_dw_tipo_ubicacion_dir,
+  -- Derivado O almacenado, en ese orden. El almacenado importa en las dos
+  -- vias: en mock es el que siembra la matriz (la posicion YA_UNIF marca con
+  -- 1 la ultima direccion del grupo y es lo que la hace funcionar), y en real
+  -- es el de rpu_generada. La rama del datashare aporta NULL, asi que alli
+  -- manda la derivacion.
+  CASE WHEN est.cod_dw_persona_ubic IS NOT NULL THEN 1
+       ELSE rpu_u.ind_unificacion END AS ind_unificacion,
   ROW_NUMBER() OVER (
-    PARTITION BY id_buro_persona, cod_dw_ubic, cod_dw_tipo_ubicacion_dir
-    ORDER BY fecha_relacion_persona_ubicaci DESC NULLS LAST, cod_dw_persona_ubic
+    PARTITION BY rpu_u.id_buro_persona, rpu_u.cod_dw_ubic, rpu_u.cod_dw_tipo_ubicacion_dir
+    ORDER BY rpu_u.fecha_relacion_persona_ubicaci DESC NULLS LAST, rpu_u.cod_dw_persona_ubic
   ) AS orden_prioridad,
-  fecha_relacion_persona_ubicaci,
-  lote,
-  cod_tipo_ident_fte,
-  bloqueado
+  rpu_u.fecha_relacion_persona_ubicaci,
+  rpu_u.lote,
+  rpu_u.cod_tipo_ident_fte,
+  rpu_u.bloqueado
 FROM (
   SELECT
     cod_dw_persona_ubic, id_buro_persona, cod_pin_persona, cod_dw_ubic,
@@ -143,6 +174,9 @@ FROM (
   FROM bdm_datos.rpu_generada
   WHERE fecha_inactivacion IS NULL
 ) rpu_u
+LEFT JOIN ( SELECT DISTINCT cod_dw_persona_ubic
+              FROM bdm_datos.unificacion_direccion ) est
+       ON est.cod_dw_persona_ubic = rpu_u.cod_dw_persona_ubic
 WITH NO SCHEMA BINDING;
 
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_ubicacion_estandarizada AS
