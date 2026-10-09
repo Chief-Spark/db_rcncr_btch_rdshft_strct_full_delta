@@ -1,6 +1,7 @@
 00_prerequisitos_schemas.sql
 01_ddl_unificacion_direccion.sql
 01b_ddl_unificacion_direccion_mock.sql
+01d_ddl_direccion_generada.sql
 02a_ddl_bdm_stage_insumo_mock.sql
 02c_ddl_mock_numeros.sql
 02_vistas_insumo_edf_views.sql

@@ -14,6 +14,7 @@ rollback_03_drop_geo.sql
 02a_rollback_ddl_bdm_stage_insumo_mock.sql
 02c_rollback_ddl_mock_numeros.sql
 rollback_02_drop_vistas.sql
+01d_rollback_ddl_direccion_generada.sql
 01b_ddl_unificacion_direccion_mock.sql
 01_ddl_unificacion_direccion.sql
 00_prerequisitos_schemas.sql
