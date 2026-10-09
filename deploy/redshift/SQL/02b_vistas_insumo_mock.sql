@@ -13,6 +13,14 @@ DROP VIEW IF EXISTS bdm_tempo.v_mock_direccion_fisica;
 DROP VIEW IF EXISTS bdm_tempo.v_mock_ubicacion_estandarizada;
 DROP VIEW IF EXISTS bdm_tempo.v_mock_relacion_persona_ubicacion;
 
+-- SLCOPRBA-1354 (M2): UNION ALL con las RPU sinteticas que produce el motor,
+-- espejo de lo que hace v_xpm_relacion_persona_ubicacion con rpu_generada.
+-- CAMBIO DE COMPORTAMIENTO DELIBERADO: orden_prioridad deja de leerse de
+-- bdm_stage y pasa a calcularse con ROW_NUMBER SOBRE LA UNION, igual que en la
+-- vista real. Antes el mock honraba el valor sembrado y el real lo calculaba:
+-- eran dos semanticas distintas. Ningun consumidor de la cadena depende de ese
+-- valor (R1 calcula su propio ROW_NUMBER y el Ordenamiento toma el suyo de
+-- rpu_orden_prioridad), de modo que el cambio alinea sin romper nada.
 CREATE OR REPLACE VIEW bdm_tempo.v_mock_relacion_persona_ubicacion AS
 SELECT
   cod_dw_persona_ubic,
@@ -22,12 +30,30 @@ SELECT
   cod_dw_direccion_fisica,
   cod_dw_tipo_ubicacion_dir,
   ind_unificacion,
-  orden_prioridad,
+  ROW_NUMBER() OVER (
+    PARTITION BY id_buro_persona, cod_dw_ubic, cod_dw_tipo_ubicacion_dir
+    ORDER BY fecha_relacion_persona_ubicaci DESC NULLS LAST, cod_dw_persona_ubic
+  ) AS orden_prioridad,
   fecha_relacion_persona_ubicaci,
   lote,
   cod_tipo_ident_fte,
-  CAST(0 AS SMALLINT) AS bloqueado
-FROM bdm_stage.relacion_persona_ubicacion
+  bloqueado
+FROM (
+  SELECT
+    cod_dw_persona_ubic, id_buro_persona, cod_pin_persona, cod_dw_ubic,
+    cod_dw_direccion_fisica, cod_dw_tipo_ubicacion_dir, ind_unificacion,
+    fecha_relacion_persona_ubicaci, lote, cod_tipo_ident_fte,
+    CAST(0 AS SMALLINT) AS bloqueado
+  FROM bdm_stage.relacion_persona_ubicacion
+  UNION ALL
+  SELECT
+    cod_dw_persona_ubic, id_buro_persona, cod_pin_persona, cod_dw_ubic,
+    cod_dw_direccion_fisica, cod_dw_tipo_ubicacion_dir, ind_unificacion,
+    fecha_relacion_persona_ubicaci, lote, cod_tipo_ident_fte,
+    CAST(0 AS SMALLINT) AS bloqueado
+  FROM bdm_datos.rpu_generada_mock
+  WHERE fecha_inactivacion IS NULL
+) rpu_u
 WITH NO SCHEMA BINDING;
 
 CREATE OR REPLACE VIEW bdm_tempo.v_mock_ubicacion_estandarizada AS
@@ -48,17 +74,44 @@ SELECT
 FROM bdm_stage.ubicacion_estandarizada
 WITH NO SCHEMA BINDING;
 
+-- SLCOPRBA-1354 (M2): UNION ALL con las direcciones que produce el motor.
+-- Las columnas de via siguen siendo NULL en la rama de semillas (bdm_stage no
+-- las almacena) pero SI llegan con valor desde direccion_fisica_generada_mock,
+-- que las hereda de la direccion de origen igual que el real.
 CREATE OR REPLACE VIEW bdm_tempo.v_mock_direccion_fisica AS
 SELECT
   cod_dw_direccion_fisica,
   complemento,
-  CAST(NULL AS VARCHAR(50)) AS tipo_via_principal,
-  CAST(NULL AS VARCHAR(100)) AS via_principal,
-  CAST(NULL AS VARCHAR(100)) AS via_generadora,
-  CAST(NULL AS VARCHAR(50)) AS numero_puerta,
+  tipo_via_principal,
+  via_principal,
+  via_generadora,
+  numero_puerta,
   cod_dw_ubic,
-  COALESCE(generada_enriquecida, 0) AS generada_enriquecida
-FROM bdm_stage.direccion_fisica
+  generada_enriquecida
+FROM (
+  SELECT
+    cod_dw_direccion_fisica,
+    complemento,
+    CAST(NULL AS VARCHAR(50))  AS tipo_via_principal,
+    CAST(NULL AS VARCHAR(100)) AS via_principal,
+    CAST(NULL AS VARCHAR(100)) AS via_generadora,
+    CAST(NULL AS VARCHAR(50))  AS numero_puerta,
+    cod_dw_ubic,
+    COALESCE(generada_enriquecida, 0) AS generada_enriquecida
+  FROM bdm_stage.direccion_fisica
+  UNION ALL
+  SELECT
+    cod_dw_direccion_fisica,
+    complemento,
+    tipo_via_principal,
+    via_principal,
+    via_generadora,
+    numero_puerta,
+    cod_dw_ubic,
+    COALESCE(generada_enriquecida, 1) AS generada_enriquecida
+  FROM bdm_datos.direccion_fisica_generada_mock
+  WHERE fecha_inactivacion IS NULL
+) df_u
 WITH NO SCHEMA BINDING;
 
 CREATE OR REPLACE VIEW bdm_tempo.v_mock_reporte_relacion_persona_ubica AS

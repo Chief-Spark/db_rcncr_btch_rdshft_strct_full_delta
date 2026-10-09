@@ -79,10 +79,20 @@ CREATE TABLE IF NOT EXISTS bdm_stage.nomenclatura (
 )
 DISTSTYLE ALL;
 
+-- SLCOPRBA-1354 (M2): +nomen y +valor para igualar a
+-- bdm_datos.diccionario_complementos. Las necesita la descomposicion del
+-- complemento por componentes del motor: el legado une
+-- NOMENCLATURA.NOMENCLATURA = DICCIONARIO_COMPLEMENTOS.Nomen para obtener el
+-- Nivel_Complemento de cada componente. Sin 'nomen' la via mock no podria
+-- ejercitar esa descomposicion y dejaria de ser espejo del real.
+-- DROP + CREATE: tabla de semillas mock, sin dato productivo que perder.
+DROP TABLE IF EXISTS bdm_stage.diccionario_complementos;
 CREATE TABLE IF NOT EXISTS bdm_stage.diccionario_complementos (
   id_buro_persona BIGINT,
   cod_dw_ubic     BIGINT,
   nomenclatura    VARCHAR(100),
+  nomen           VARCHAR(10),
+  valor           VARCHAR(50),
   frecuencia      INTEGER
 )
 DISTSTYLE KEY DISTKEY (id_buro_persona)

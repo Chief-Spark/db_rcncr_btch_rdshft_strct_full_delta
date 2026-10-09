@@ -95,6 +95,19 @@ INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location_val_contactinformations ci
 WHERE NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('1', '2', '3', '7', '8')
 WITH NO SCHEMA BINDING;
 
+-- SLCOPRBA-1354 (M2): la vista pasa a ser UNION ALL del datashare con las
+-- RPU sinteticas que produce el motor de Regla 2. Mismo patron que
+-- bdm_datos.geo_atributos: una tabla local suple lo que el datashare, de solo
+-- lectura, no deja escribir. Sin esto, el motor persistiria en un catalogo que
+-- ningun consumidor leeria.
+-- Se filtra fecha_inactivacion IS NULL: una direccion generada se puede retirar
+-- de circulacion sin borrar el historico (el legado contempla esa columna en su
+-- INSERT a DIRECCION_FISICA).
+-- IMPORTANTE: orden_prioridad se calcula AHORA SOBRE LA UNION, no por rama. La
+-- direccion generada participa del orden de prioridad de la persona, que es
+-- justo lo que la hace util aguas abajo (Ordenamiento).
+-- ind_unificacion sigue llegando como constante NULL desde el datashare, pero
+-- de rpu_generada llega el valor REAL de la tabla.
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_relacion_persona_ubicacion AS
 SELECT
   cod_dw_persona_ubic,
@@ -103,7 +116,7 @@ SELECT
   cod_dw_ubic,
   cod_dw_direccion_fisica,
   cod_dw_tipo_ubicacion_dir,
-  CAST(NULL AS INTEGER) AS ind_unificacion,
+  ind_unificacion,
   ROW_NUMBER() OVER (
     PARTITION BY id_buro_persona, cod_dw_ubic, cod_dw_tipo_ubicacion_dir
     ORDER BY fecha_relacion_persona_ubicaci DESC NULLS LAST, cod_dw_persona_ubic
@@ -111,8 +124,25 @@ SELECT
   fecha_relacion_persona_ubicaci,
   lote,
   cod_tipo_ident_fte,
-  CAST(0 AS SMALLINT) AS bloqueado
-FROM bdm_tempo.v_xpm_contacto_direccion
+  bloqueado
+FROM (
+  SELECT
+    cod_dw_persona_ubic, id_buro_persona, cod_pin_persona, cod_dw_ubic,
+    cod_dw_direccion_fisica, cod_dw_tipo_ubicacion_dir,
+    CAST(NULL AS INTEGER) AS ind_unificacion,
+    fecha_relacion_persona_ubicaci, lote, cod_tipo_ident_fte,
+    CAST(0 AS SMALLINT)   AS bloqueado
+  FROM bdm_tempo.v_xpm_contacto_direccion
+  UNION ALL
+  SELECT
+    cod_dw_persona_ubic, id_buro_persona, cod_pin_persona, cod_dw_ubic,
+    cod_dw_direccion_fisica, cod_dw_tipo_ubicacion_dir,
+    ind_unificacion,
+    fecha_relacion_persona_ubicaci, lote, cod_tipo_ident_fte,
+    CAST(0 AS SMALLINT)   AS bloqueado
+  FROM bdm_datos.rpu_generada
+  WHERE fecha_inactivacion IS NULL
+) rpu_u
 WITH NO SCHEMA BINDING;
 
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_ubicacion_estandarizada AS
@@ -133,6 +163,17 @@ SELECT DISTINCT
 FROM bdm_tempo.v_xpm_contacto_direccion
 WITH NO SCHEMA BINDING;
 
+-- SLCOPRBA-1354 (M2): la vista pasa a ser UNION ALL del datashare con las
+-- direcciones generadas que produce el motor de Regla 2. Mismo patron que
+-- bdm_datos.geo_atributos: una tabla local suple lo que el datashare, de solo
+-- lectura, no deja escribir. Sin esto, el motor persistiria en un catalogo que
+-- ningun consumidor leeria.
+-- Se filtra fecha_inactivacion IS NULL: una direccion generada se puede retirar
+-- de circulacion sin borrar el historico (el legado contempla esa columna en su
+-- INSERT a DIRECCION_FISICA).
+-- generada_enriquecida deja de ser constante 0: vale 0 para lo que viene del
+-- datashare y 1 para lo que creo el motor, que es la semantica del legado
+-- (Generada_Enriquecida en DIRECCION_FISICA).
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_direccion_fisica AS
 SELECT DISTINCT
   cod_dw_direccion_fisica,
@@ -142,8 +183,21 @@ SELECT DISTINCT
   via_generadora,
   numero_puerta,
   cod_dw_ubic,
-  CAST(0 AS INTEGER) AS generada_enriquecida
-FROM bdm_tempo.v_xpm_contacto_direccion
+  generada_enriquecida
+FROM (
+  SELECT
+    cod_dw_direccion_fisica, complemento, tipo_via_principal, via_principal,
+    via_generadora, numero_puerta, cod_dw_ubic,
+    CAST(0 AS INTEGER) AS generada_enriquecida
+  FROM bdm_tempo.v_xpm_contacto_direccion
+  UNION ALL
+  SELECT
+    cod_dw_direccion_fisica, complemento, tipo_via_principal, via_principal,
+    via_generadora, numero_puerta, cod_dw_ubic,
+    COALESCE(generada_enriquecida, 1) AS generada_enriquecida
+  FROM bdm_datos.direccion_fisica_generada
+  WHERE fecha_inactivacion IS NULL
+) df_u
 WITH NO SCHEMA BINDING;
 
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_reporte_relacion_persona_ubica AS
