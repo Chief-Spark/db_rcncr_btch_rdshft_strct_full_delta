@@ -7,6 +7,8 @@
 02_rollback_carga_betas_ritm5226589.sql
 02_rollback_catalogos_ordenamiento.sql
 01_rollback_ddl_ordenamiento.sql
+11d_rollback_ddl_unif_escenario_censo_mock.sql
+11c_rollback_ddl_unif_escenario_censo.sql
 11b_rollback_ddl_unif_control_mock.sql
 11_rollback_ddl_unif_control.sql
 03b_rollback_ddl_geo_mock.sql
