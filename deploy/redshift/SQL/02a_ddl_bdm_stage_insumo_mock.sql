@@ -7,7 +7,24 @@
 
 CREATE SCHEMA IF NOT EXISTS bdm_stage;
 
-CREATE TABLE IF NOT EXISTS bdm_stage.relacion_persona_ubicacion (
+-- SLCOPRBA-1355: se agrega la columna BLOQUEADO al contrato de la tabla mock.
+--
+-- POR QUE DROP + CREATE Y NO ALTER: Redshift no admite
+-- ADD COLUMN IF NOT EXISTS, y CREATE TABLE IF NOT EXISTS no altera una tabla
+-- que ya existe, de modo que un ALTER plano funcionaria la primera vez y
+-- rompería el despliegue en todos los siguientes con "column already exists".
+-- Recrear es seguro AQUI y solo aqui porque esta tabla es scaffolding de mock:
+-- no guarda nada que no regenere el seed. reset_mock la trunca y
+-- seed_mock_matriz la repuebla completa en cada corrida de la bateria.
+--
+-- PARA QUE SIRVE LA COLUMNA: los insumos de R1 y R2 filtran
+-- COALESCE(rpu.bloqueado, 0) = 0, que es el filtro de estado del legado
+-- Teradata. Sin la columna ese predicado era siempre verdadero y los criterios
+-- R1-06 y G-04 no se podian afirmar: el codigo excluye bloqueadas, pero no
+-- habia ni una bloqueada en el universo. El arquetipo ARQ 59 la siembra.
+DROP TABLE IF EXISTS bdm_stage.relacion_persona_ubicacion;
+
+CREATE TABLE bdm_stage.relacion_persona_ubicacion (
   cod_dw_persona_ubic            BIGINT,
   id_buro_persona                BIGINT,
   cod_pin_persona                BIGINT,
@@ -18,7 +35,8 @@ CREATE TABLE IF NOT EXISTS bdm_stage.relacion_persona_ubicacion (
   orden_prioridad                INTEGER,
   fecha_relacion_persona_ubicaci DATE,
   lote                           INTEGER,
-  cod_tipo_ident_fte             VARCHAR(20)
+  cod_tipo_ident_fte             VARCHAR(20),
+  bloqueado                      SMALLINT    -- 1 = reclamacion del titular
 )
 DISTSTYLE KEY DISTKEY (id_buro_persona)
 SORTKEY (id_buro_persona, cod_dw_persona_ubic);

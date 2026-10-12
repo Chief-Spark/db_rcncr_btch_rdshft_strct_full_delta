@@ -97,7 +97,13 @@ FROM (
     CAST(fecha_relacion_persona_ubicaci AS DATE)     AS fecha_relacion_persona_ubicaci,
     CAST(lote                           AS INTEGER)  AS lote,
     cod_tipo_ident_fte                               AS cod_tipo_ident_fte,
-    CAST(0                              AS SMALLINT) AS bloqueado
+    -- SLCOPRBA-1355: bloqueado se PROPAGA desde la tabla base, ya no es la
+    -- constante 0. Mientras fue constante, el filtro
+    -- COALESCE(rpu.bloqueado, 0) = 0 de los insumos de R1 y R2 era siempre
+    -- verdadero y los criterios R1-06 y G-04 no se podian afirmar: el codigo
+    -- excluia bloqueadas pero el universo no tenia ninguna. Lo siembra el
+    -- arquetipo ARQ 59.
+    CAST(COALESCE(bloqueado, 0)         AS SMALLINT) AS bloqueado
   FROM bdm_stage.relacion_persona_ubicacion
   UNION ALL
   SELECT
@@ -111,6 +117,8 @@ FROM (
     CAST(fecha_relacion_persona_ubicaci AS DATE),
     CAST(lote                           AS INTEGER),
     cod_tipo_ident_fte,
+    -- La rama del motor se queda en 0: una direccion que el proceso acaba de
+    -- crear no puede tener reclamacion del titular.
     CAST(0                              AS SMALLINT)
   FROM bdm_datos.rpu_generada_mock
   WHERE fecha_inactivacion IS NULL
