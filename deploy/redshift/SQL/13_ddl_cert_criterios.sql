@@ -61,6 +61,32 @@ CREATE TABLE IF NOT EXISTS bdm_datos.cert_resultado (
 DISTSTYLE ALL
 SORTKEY (lote, criterio);
 
+-- ------------------------------------------------------------
+-- Ultimo veredicto de cada criterio.
+--
+-- POR QUE NO 'WHERE lote = MAX(lote)': el numero de lote NO ordena las
+-- corridas en el tiempo. La bateria corre primero el e2e (lotes 1356601,
+-- 1356602, 1356604) y despues la convergencia (1356501..1356504), que son
+-- numericamente MENORES. Con MAX(lote) el tablero mostraria la evaluacion del
+-- e2e, donde G-06 todavia sale SIN_DATO porque los criterios de convergencia
+-- CA-C01..CA-C08 aun no se habian escrito.
+--
+-- El desempate secundario por lote existe porque el gate es NONATOMIC: cada
+-- INSERT es su propia transaccion y dos criterios de la misma llamada pueden
+-- quedar con marcas de tiempo distintas por milisegundos.
+--
+-- WITH NO SCHEMA BINDING: consistente con el resto de las vistas del proyecto,
+-- de modo que el orden de despliegue no la rompa.
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW bdm_datos.v_cert_ultimo AS
+SELECT criterio, estado, detalle, lote, modo, fecha_hora
+FROM ( SELECT criterio, estado, detalle, lote, modo, fecha_hora,
+              ROW_NUMBER() OVER (PARTITION BY criterio
+                                 ORDER BY fecha_hora DESC, lote DESC) AS rn
+         FROM bdm_datos.cert_resultado ) u
+WHERE rn = 1
+WITH NO SCHEMA BINDING;
+
 TRUNCATE TABLE bdm_datos.cert_criterio;
 
 INSERT INTO bdm_datos.cert_criterio
