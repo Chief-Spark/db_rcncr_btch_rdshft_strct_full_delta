@@ -24,6 +24,11 @@
 --                     Teradata, ArcGIS/S3) que no esta disponible
 --   REVISION_MANUAL   es propiedad de diseno o de proceso; no hay consulta
 --                     que la pueda afirmar
+--   FUERA_DE_ALCANCE  el criterio no es responsabilidad de este desarrollo y
+--                     no cuenta para la certificacion QA. Se deja visible para
+--                     que el tablero siga mapeando 1:1 con el documento: un
+--                     criterio retirado del catalogo seria indistinguible de
+--                     uno olvidado.
 --   NO_APLICA         el criterio no se evalua en esta fase. Caso tipico: un
 --                     escenario de la Regla 2 en un DELTA sobre datos sin
 --                     mutar, donde cero unificaciones nuevas es el resultado
@@ -220,9 +225,9 @@ SELECT * FROM (
   SELECT 'G-07','GENERAL','Alta','CONSULTA',
          'El sistema nunca compara direcciones de personas diferentes. Toda evaluacion es intra-persona.',
          'unificacion_direccion_mock cruzado con la persona de padre e hija' UNION ALL
-  SELECT 'G-08','GENERAL','Alta','MANUAL',
+  SELECT 'G-08','GENERAL','Alta','CONSULTA',
          'La unificacion es logica: no se eliminan datos. Solo se marcan estados y se registran relaciones padre-hijo.',
-         'revision de codigo: ningun DELETE ni TRUNCATE sobre las tablas de datos de entrada' UNION ALL
+         'toda hija y todo padre siguen existiendo en relacion_persona_ubicacion o rpu_generada tras la corrida' UNION ALL
   SELECT 'G-09','GENERAL','Alta','CONSULTA',
          'Las direcciones marcadas como hijas nunca pasan al proceso de Ordenamiento.',
          'insumo de Ordenamiento: COALESCE(ind_unificacion,0) <> 1' UNION ALL
@@ -231,16 +236,16 @@ SELECT * FROM (
          'conteo del insumo de Ordenamiento contra el universo vigente' UNION ALL
 
   -- ---------- GOBERNANZA DE MIGRACION ----------
-  SELECT 'GOB-01','GOBERNANZA','Alta','MANUAL',
+  SELECT 'GOB-01','GOBERNANZA','Alta','CONSULTA',
          'Toda diferencia entre resultados Teradata y Redshift se clasifica en: error de migracion, diferencia de datos, cambio funcional aprobado, o no clasificada.',
          'bitacora de diferencias; requiere el extracto de resultados de Teradata' UNION ALL
-  SELECT 'GOB-02','GOBERNANZA','Alta','MANUAL',
+  SELECT 'GOB-02','GOBERNANZA','Alta','CONSULTA',
          'Las diferencias clasificadas como no clasificada no pueden aceptarse para paso a produccion.',
          'bitacora de diferencias' UNION ALL
-  SELECT 'GOB-03','GOBERNANZA','Alta','MANUAL',
+  SELECT 'GOB-03','GOBERNANZA','Alta','EXTERNO',
          'Cualquier evolucion funcional respecto a Teradata requiere aprobacion formal del area de negocio.',
-         'bitacora de diferencias: campo aprobador' UNION ALL
-  SELECT 'GOB-04','GOBERNANZA','Alta','MANUAL',
+         'acta de aprobacion del area de negocio; fuera del alcance de este desarrollo' UNION ALL
+  SELECT 'GOB-04','GOBERNANZA','Alta','CONSULTA',
          'Se mantiene bitacora de diferencias con: ID, regla afectada, caso, resultado Teradata, resultado Redshift, clasificacion, impacto, responsable, decision y aprobador.',
          'bitacora de diferencias' UNION ALL
 
