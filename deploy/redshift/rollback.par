@@ -1,3 +1,4 @@
+13_rollback_ddl_cert_criterios.sql
 12_rollback_ddl_unif_convergencia_mock.sql
 12_rollback_ddl_ord_control.sql
 06_rollback_vistas_mock_post_unificacion.sql
