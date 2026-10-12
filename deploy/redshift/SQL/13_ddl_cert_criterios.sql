@@ -24,6 +24,10 @@
 --                     Teradata, ArcGIS/S3) que no esta disponible
 --   REVISION_MANUAL   es propiedad de diseno o de proceso; no hay consulta
 --                     que la pueda afirmar
+--   NO_APLICA         el criterio no se evalua en esta fase. Caso tipico: un
+--                     escenario de la Regla 2 en un DELTA sobre datos sin
+--                     mutar, donde cero unificaciones nuevas es el resultado
+--                     CORRECTO y no un fallo. Se certifica en la fase FULL.
 -- ============================================================
 
 CREATE SCHEMA IF NOT EXISTS bdm_datos;
