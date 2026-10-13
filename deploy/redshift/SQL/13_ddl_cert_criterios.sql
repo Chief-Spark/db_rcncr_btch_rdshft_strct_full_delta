@@ -148,7 +148,7 @@ SELECT * FROM (
          'ARQ 71 (banda 9710000..9710999); direccion_fisica_generada_mock; censo n_id = A6; legado escenario 5 subcaso 1, lineas 2250-3607' UNION ALL
   SELECT 'R2-07','REGLA2','Alta','CONSULTA',
          'Escenario 6 (ninguna contenida en la otra): se evalua por nivel y frecuencia; segun el subcaso se genera direccion nueva o se usa el diccionario.',
-         'censo n_id = A8 (sub1), D9 (sub2), F1 (sub3); legado lineas 4016-5847' UNION ALL
+         'A8 (esc6 sub1) IMPLEMENTADO y verificado con el ARQ 72 (banda 9720000..9720999), complemento generado ''BL 2 ED 7''. Falta D9 (esc6 sub2, legado 4715-5448). F1 (sub3, diccionario) esta aproximado por E6, sello propio que no existe en el legado. censo n_id = A8, D9, F1' UNION ALL
   SELECT 'R2-08','REGLA2','Alta','CONSULTA',
          'Las direcciones nuevas generadas por combinacion quedan marcadas como generadas.',
          'direccion_fisica_generada_mock.generada_enriquecida = 1' UNION ALL
