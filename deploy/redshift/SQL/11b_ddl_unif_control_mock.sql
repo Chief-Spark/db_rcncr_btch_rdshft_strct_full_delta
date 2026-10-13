@@ -18,10 +18,14 @@
 --   Con tablas separadas, mock y real tienen watermarks independientes y las
 --   baterias de prueba se pueden repetir sin contaminar el historico real.
 --
--- ETAPAS EN MOCK: regla1 | regla2 | regla2_escN | geo
---   NO existe la etapa 'regla3': la Regla 3 depende de coordenadas
---   (geo_atributos.latitud/longitud) y en la certificacion mock no hay
---   enriquecimiento GEO, por lo que queda fuera de alcance por diseno.
+-- ETAPAS EN MOCK: regla1 | regla2 | regla2_escN | geo | regla3
+--   SLCOPRBA-1355: 'regla3' SI existe ahora. Este comentario decia que no, y
+--   su razon era correcta en su momento: la Regla 3 decide por coordenadas y
+--   en la bateria mock no habia ninguna. Lo que cambio es que el seed de R3
+--   siembra coordenadas y que las vistas de insumo ya leen geo_atributos, de
+--   modo que la etapa produce filas en vez de quedar vacia.
+--   Va DESPUES de geo, que es la cascada real: las coordenadas sobre las que
+--   R3 decide las escribe el Ciclo GEO.
 -- ============================================================
 
 CREATE SCHEMA IF NOT EXISTS bdm_datos;
@@ -62,7 +66,7 @@ SORTKEY (corrida_id);
 CREATE TABLE IF NOT EXISTS bdm_datos.unif_control_etapa_mock (
   corrida_id                  BIGINT       NOT NULL,   -- FK logico a unif_control_mock.corrida_id
   lote                        INTEGER      NOT NULL,   -- Lote_Corrida
-  etapa                       VARCHAR(20)  NOT NULL,   -- regla1 | regla2 | regla2_escN | geo
+  etapa                       VARCHAR(20)  NOT NULL,   -- regla1 | regla2 | regla2_escN | geo | regla3
   estado                      VARCHAR(12)  NOT NULL,   -- en proceso | completado | fallido
   fecha_hora_inicio           TIMESTAMP    NOT NULL,
   fecha_hora_fin              TIMESTAMP,

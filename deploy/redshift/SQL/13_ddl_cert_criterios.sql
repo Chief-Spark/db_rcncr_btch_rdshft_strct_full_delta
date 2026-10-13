@@ -145,7 +145,7 @@ SELECT * FROM (
          'censo n_id = B5; diccionario_complementos; legado linea 2226' UNION ALL
   SELECT 'R2-06','REGLA2','Alta','CONSULTA',
          'Escenario 5 (nomenclaturas distintas, distinto nivel): se genera una direccion nueva que combina ambas y las dos originales quedan como hijas.',
-         'censo n_id = A6; legado escenario 5 subcaso 1, lineas 2250-3607' UNION ALL
+         'ARQ 71 (banda 9710000..9710999); direccion_fisica_generada_mock; censo n_id = A6; legado escenario 5 subcaso 1, lineas 2250-3607' UNION ALL
   SELECT 'R2-07','REGLA2','Alta','CONSULTA',
          'Escenario 6 (ninguna contenida en la otra): se evalua por nivel y frecuencia; segun el subcaso se genera direccion nueva o se usa el diccionario.',
          'censo n_id = A8 (sub1), D9 (sub2), F1 (sub3); legado lineas 4016-5847' UNION ALL
