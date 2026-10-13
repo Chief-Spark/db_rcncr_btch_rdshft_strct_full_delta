@@ -128,22 +128,59 @@ LEFT JOIN ( SELECT DISTINCT cod_dw_persona_ubic
        ON est.cod_dw_persona_ubic = rpu_u.cod_dw_persona_ubic
 WITH NO SCHEMA BINDING;
 
+-- SLCOPRBA-1355: dos cambios, los dos para que la Regla 3 pueda existir.
+--
+-- 1) tipo_ubicacion deja de ser CAST(NULL AS VARCHAR(50)) y sale de la tabla.
+--    Es el criterio de ENTRADA de R3 ("aplica exclusivamente a direcciones de
+--    tipo Via"); mientras fue una constante nula, el filtro era siempre falso
+--    o siempre verdadero segun como se escribiera, y el criterio no se podia
+--    afirmar con dato.
+--
+-- 2) latitud/longitud se COALESCEan contra bdm_datos.geo_atributos_mock.
+--    Esto cierra el segundo de los dos defectos encadenados de CA-04: el Ciclo
+--    GEO escribe las coordenadas en geo_atributos y NINGUNA vista de insumo las
+--    leia, de modo que la Regla 3 no veia nunca lo que el Ciclo GEO produce. En
+--    la via real el agujero es total: v_xpm_contacto_direccion expone
+--    latitud/longitud como CAST(NULL AS DECIMAL(10,6)) -- el datashare no las
+--    publica -- asi que geo_atributos es la UNICA fuente posible y sin este
+--    COALESCE R3 no podria unificar jamas sobre datos reales.
+--
+--    GANA LA SEMBRADA, no la geocodificada: COALESCE(ubi.latitud, g.latitud).
+--    La tabla mock es la fuente de verdad del fixture (el ARQ 56 siembra sus
+--    propias coordenadas como control negativo del Exportador_GEO) y el Ciclo
+--    GEO solo debe APORTAR lo que falta. En la via real el primer termino es
+--    siempre NULL, de modo que alli el orden no cambia nada.
+--
+--    UNA FILA POR UBICACION: geo_atributos no tiene clave unica declarada --
+--    Redshift no las impone -- y una ubicacion puede tener fila en varios
+--    Lotes. Sin reducir, el LEFT JOIN multiplicaria el insumo de TODAS las
+--    reglas, no solo de R3. Se toma la mas reciente por lote y solo si trae
+--    las dos coordenadas.
 CREATE OR REPLACE VIEW bdm_tempo.v_mock_ubicacion_estandarizada AS
 SELECT
-  cod_dw_ubic,
-  texto_ubicacion,
-  texto_ubicacion AS texto_ubicacion_normalizado,
-  texto_ubicacion AS texto_ubicacion_original,
+  ubi.cod_dw_ubic,
+  ubi.texto_ubicacion,
+  ubi.texto_ubicacion AS texto_ubicacion_normalizado,
+  ubi.texto_ubicacion AS texto_ubicacion_original,
   CAST(NULL AS DECIMAL(5,4)) AS score_estandarizacion,
-  cod_dw_ciudad,
-  cod_dw_ciudad AS cod_dw_municipio,
-  departamento,
-  municipio,
-  CAST(NULL AS VARCHAR(50)) AS tipo_ubicacion,
+  ubi.cod_dw_ciudad,
+  ubi.cod_dw_ciudad AS cod_dw_municipio,
+  ubi.departamento,
+  ubi.municipio,
+  ubi.tipo_ubicacion,
   CAST(NULL AS INTEGER) AS cod_dw_tipo_ubicacion,
-  latitud,
-  longitud
-FROM bdm_stage.ubicacion_estandarizada
+  COALESCE(ubi.latitud,  CAST(g.latitud  AS DECIMAL(12,8))) AS latitud,
+  COALESCE(ubi.longitud, CAST(g.longitud AS DECIMAL(12,8))) AS longitud
+FROM bdm_stage.ubicacion_estandarizada ubi
+LEFT JOIN (
+  SELECT cod_dw_ubic, latitud, longitud
+  FROM ( SELECT cod_dw_ubic, latitud, longitud,
+                ROW_NUMBER() OVER (PARTITION BY cod_dw_ubic
+                                   ORDER BY lote DESC NULLS LAST) AS rn
+           FROM bdm_datos.geo_atributos_mock
+          WHERE latitud IS NOT NULL AND longitud IS NOT NULL ) z
+  WHERE rn = 1
+) g ON g.cod_dw_ubic = ubi.cod_dw_ubic
 WITH NO SCHEMA BINDING;
 
 -- SLCOPRBA-1354 (M2): UNION ALL con las direcciones que produce el motor.
@@ -169,10 +206,15 @@ FROM (
   SELECT
     CAST(cod_dw_direccion_fisica AS BIGINT)    AS cod_dw_direccion_fisica,
     complemento,
-    CAST(NULL AS VARCHAR(50))  AS tipo_via_principal,
-    CAST(NULL AS VARCHAR(100)) AS via_principal,
-    CAST(NULL AS VARCHAR(100)) AS via_generadora,
-    CAST(NULL AS VARCHAR(50))  AS numero_puerta,
+    -- SLCOPRBA-1355: salen de la tabla, ya no son constantes nulas. Son el
+    -- criterio de la Regla 3 (tipo de via, via principal, via generadora y
+    -- numero de puerta); mientras fueron NULL, R3 no tenia con que comparar.
+    -- Los CAST se mantienen por el UNION ALL con direccion_fisica_generada_mock
+    -- y van a los MISMOS tipos que declara esa tabla.
+    CAST(tipo_via_principal AS VARCHAR(50))    AS tipo_via_principal,
+    CAST(via_principal      AS VARCHAR(100))   AS via_principal,
+    CAST(via_generadora     AS VARCHAR(100))   AS via_generadora,
+    CAST(numero_puerta      AS VARCHAR(50))    AS numero_puerta,
     CAST(cod_dw_ubic             AS BIGINT)    AS cod_dw_ubic,
     CAST(COALESCE(generada_enriquecida, 0) AS INTEGER) AS generada_enriquecida
   FROM bdm_stage.direccion_fisica

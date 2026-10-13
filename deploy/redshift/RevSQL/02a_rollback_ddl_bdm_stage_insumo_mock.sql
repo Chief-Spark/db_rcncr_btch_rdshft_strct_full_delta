@@ -1,5 +1,6 @@
 -- Rollback 02a: DDL bdm_stage insumo mock
 DROP TABLE IF EXISTS bdm_stage.contacto_canal;
+DROP TABLE IF EXISTS bdm_stage.diccionario_via;
 DROP TABLE IF EXISTS bdm_stage.diccionario_complementos;
 DROP TABLE IF EXISTS bdm_stage.nomenclatura;
 DROP TABLE IF EXISTS bdm_stage.tipo_ubicacion_dir;

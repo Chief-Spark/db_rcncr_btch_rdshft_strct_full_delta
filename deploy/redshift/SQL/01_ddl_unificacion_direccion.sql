@@ -81,6 +81,35 @@ DISTSTYLE KEY
 DISTKEY (cod_dw_ubic)
 SORTKEY (cod_dw_ubic, id_buro_persona);
 
+-- ------------------------------------------------------------
+-- bdm_datos.diccionario_via -- SLCOPRBA-1355
+-- Diccionario de Via de la Regla 3; espejo real de bdm_stage.diccionario_via.
+-- Puerto de REC_STAGE.DICCIONARIO_VIA (P0021_UNIFICACION_111.BTQ): es el
+-- desempate del subcaso "las dos direcciones tienen coordenadas" -- gana la
+-- que mas se ha reportado historicamente.
+--
+-- DOS TIPOS EN LA MISMA TABLA, uno por escenario de emparejamiento:
+--   'Via_Generadora'  llave = tipo_via_principal + via_principal + numero_puerta
+--                     valor = via_generadora        (lo que varia en el esc 1)
+--   'Numero_Puerta'   llave = tipo_via_principal + via_principal + via_generadora
+--                     valor = numero_puerta         (lo que varia en el esc 2)
+--
+-- DROP + CREATE y no CREATE IF NOT EXISTS, por la misma razon que
+-- diccionario_complementos: es una CACHE DERIVADA que
+-- sp_unificacion_r3_construir_diccionario_via reconstruye al inicio de cada
+-- Regla 3, de modo que recrearla no pierde nada.
+DROP TABLE IF EXISTS bdm_datos.diccionario_via;
+CREATE TABLE bdm_datos.diccionario_via (
+  tipo             VARCHAR(20)  NOT NULL,   -- 'Via_Generadora' | 'Numero_Puerta'
+  llave            VARCHAR(300) NOT NULL,   -- los dos componentes FIJOS del escenario
+  valor            VARCHAR(100),            -- el componente que VARIA
+  cod_dw_municipio INTEGER,
+  conteo           BIGINT
+)
+DISTSTYLE KEY
+DISTKEY (llave)
+SORTKEY (tipo, llave, valor);
+
 CREATE TABLE IF NOT EXISTS bdm_datos.tipo_ubicacion_dir (
   cod_dw_tipo_ubicacion_dir INTEGER,
   descripcion_tipo_ubicacion_dir VARCHAR(20)

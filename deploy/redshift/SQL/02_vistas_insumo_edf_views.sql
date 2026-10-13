@@ -215,22 +215,56 @@ LEFT JOIN ( SELECT DISTINCT cod_dw_persona_ubic
        ON est.cod_dw_persona_ubic = rpu_u.cod_dw_persona_ubic
 WITH NO SCHEMA BINDING;
 
+-- SLCOPRBA-1355: latitud/longitud se COALESCEan contra bdm_datos.geo_atributos.
+--
+-- EL DATASHARE NO PUBLICA COORDENADAS. v_xpm_contacto_direccion las expone como
+-- CAST(NULL AS DECIMAL(10,6)), de modo que esta vista entregaba NULL en las dos
+-- columnas SIEMPRE. El insumo de la Regla 3 exige coordenadas, asi que R3 no
+-- podia unificar NUNCA sobre datos reales: no daba error, daba cero.
+--
+-- bdm_datos.geo_atributos es la unica fuente posible, y es justamente donde el
+-- Ciclo GEO escribe lo que devuelve ArcGIS. Que ninguna vista de insumo la
+-- leyera es el segundo de los dos defectos encadenados que CA-04 reporta.
+--
+-- UNA FILA POR UBICACION: geo_atributos no tiene clave unica declarada
+-- (Redshift no impone ninguna) y una ubicacion puede tener fila en varios
+-- Lotes. Sin reducir a una, el LEFT JOIN multiplicaria el insumo de TODAS las
+-- reglas, no solo de R3. Se toma la del lote mas reciente y solo si trae las
+-- dos coordenadas.
+--
+-- El COALESCE deja primero el valor del datashare aunque hoy sea constante
+-- nulo: el dia que el datashare las publique, manda el productor y esta vista
+-- no se vuelve a tocar. Es el mismo criterio con que ind_unificacion y
+-- bloqueado quedaron puestos antes de que el datashare los expusiera.
+--
+-- ORDEN DE DESPLIEGUE: geo_atributos la crea 03_ddl_geo.sql, que corre DESPUES
+-- de este script. No importa porque la vista es WITH NO SCHEMA BINDING y no
+-- resuelve sus referencias al crearse; nada la consulta entre los dos pasos.
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_ubicacion_estandarizada AS
 SELECT DISTINCT
-  cod_dw_ubic,
-  texto_ubicacion,
-  texto_ubicacion_normalizado,
-  texto_ubicacion_original,
-  score_estandarizacion,
-  cod_dw_ciudad,
-  cod_dw_ciudad AS cod_dw_municipio,
-  departamento,
-  municipio,
-  tipo_ubicacion,
-  cod_dw_tipo_ubicacion_dir AS cod_dw_tipo_ubicacion,
-  latitud,
-  longitud
-FROM bdm_tempo.v_xpm_contacto_direccion
+  cd.cod_dw_ubic,
+  cd.texto_ubicacion,
+  cd.texto_ubicacion_normalizado,
+  cd.texto_ubicacion_original,
+  cd.score_estandarizacion,
+  cd.cod_dw_ciudad,
+  cd.cod_dw_ciudad AS cod_dw_municipio,
+  cd.departamento,
+  cd.municipio,
+  cd.tipo_ubicacion,
+  cd.cod_dw_tipo_ubicacion_dir AS cod_dw_tipo_ubicacion,
+  COALESCE(cd.latitud,  g.latitud)  AS latitud,
+  COALESCE(cd.longitud, g.longitud) AS longitud
+FROM bdm_tempo.v_xpm_contacto_direccion cd
+LEFT JOIN (
+  SELECT cod_dw_ubic, latitud, longitud
+  FROM ( SELECT cod_dw_ubic, latitud, longitud,
+                ROW_NUMBER() OVER (PARTITION BY cod_dw_ubic
+                                   ORDER BY lote DESC NULLS LAST) AS rn
+           FROM bdm_datos.geo_atributos
+          WHERE latitud IS NOT NULL AND longitud IS NOT NULL ) z
+  WHERE rn = 1
+) g ON g.cod_dw_ubic = cd.cod_dw_ubic
 WITH NO SCHEMA BINDING;
 
 -- SLCOPRBA-1354 (M2): la vista pasa a ser UNION ALL del datashare con las
