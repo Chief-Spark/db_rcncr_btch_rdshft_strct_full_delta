@@ -209,7 +209,7 @@ SELECT * FROM (
          'unif_control_etapa_mock ordenado por fecha_hora_inicio' UNION ALL
   SELECT 'G-02','GENERAL','Alta','CONSULTA',
          'Una direccion seleccionada como padre en R1 puede ser evaluada como hija en R2 si otra tiene complemento mas completo.',
-         'cruce de unificacion_direccion_mock entre unifica_atributos 1 y 2' UNION ALL
+         'cruce de unificacion_direccion_mock entre unifica_atributos 1 y 2; ARQ 60 (banda 9600000..9600999)' UNION ALL
   SELECT 'G-03','GENERAL','Alta','CONSULTA',
          'Una direccion marcada como hija en cualquier regla no vuelve a procesarse en reglas posteriores.',
          'filtro ind_unificacion en los insumos de R2 y R3' UNION ALL
