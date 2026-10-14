@@ -44,6 +44,29 @@ catalogos y funciones. Ningun procedimiento de negocio, ningun dato.
 5. **Certificar solo con datos mock.**
 6. **Orden de despliegue: strct -> pgm -> dt.**
 
+## El banco de pruebas local
+
+`dt/banco/` replica el job de Jenkins sobre **PostgreSQL 16**, que esta
+instalado en el contenedor. Corre los tres `deploy.par` en orden, archivo a
+archivo. Existe porque Redshift **no compila el cuerpo de un procedimiento al
+crearlo** y Jenkins era el unico modo de ejecutar una linea de SQL.
+
+```
+cd dt/banco && ./banco.sh init nueva && ./banco.sh fase strct
+./banco.sh foto tras_pgm      # y ./banco.sh desde tras_pgm para re-correr en 2 s
+```
+
+**Un verde del banco NO certifica.** Degrada un `[REDSHIFT:112]` de
+"desconocido" a "especifico de Redshift". Postgres es mas permisivo que Redshift
+en cinco formas y mas estricto en tres; `banco/README.md` las lista una por una,
+y la disciplina es: **un fallo local es una hipotesis hasta trazarlo al legado o
+a la documentacion de Redshift. Nunca cambiar codigo correcto en Redshift para
+contentar a Postgres.**
+
+El banco pone de su lado un `ANALYZE` y unos indices sobre las tablas sembradas.
+Es compensacion del motor, no un parche al repo: Redshift resuelve esos joins
+por fuerza bruta columnar y Postgres en un nodo no.
+
 ## Politicas del pipeline
 
 | Codigo | Causa | Como se evita |
@@ -101,6 +124,11 @@ conserva su nombre en `RevSQL/`.
   contrario). Escribir `NULLS LAST` explicito.
 - `CREATE OR REPLACE PROCEDURE` **no compila el cuerpo**: los errores salen en
   la primera invocacion.
+- **Un literal mas largo que su columna es un `[REDSHIFT:112]`**, y
+  `CREATE TABLE IF NOT EXISTS` lo esconde: si la tabla ya existe con la columna
+  ancha de una version anterior, el `INSERT` pasa en DEV y falla en el primer
+  despliegue sobre ambiente limpio. Encontrado asi con la evidencia de `R2-07`
+  (688 caracteres contra `VARCHAR(500)`), que nunca llego a desplegarse.
 
 ## Lecciones numeradas (estaban dispersas en cabeceras)
 
