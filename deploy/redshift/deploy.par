@@ -22,3 +22,4 @@
 06_vistas_mock_post_unificacion.sql
 12_ddl_ord_control.sql
 12_ddl_unif_convergencia_mock.sql
+20_ddl_cert_criterios_ord.sql
