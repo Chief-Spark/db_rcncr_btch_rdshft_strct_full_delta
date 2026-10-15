@@ -91,9 +91,14 @@ CREATE TABLE IF NOT EXISTS bdm_stage.direccion_fisica (
 DISTSTYLE KEY DISTKEY (cod_dw_direccion_fisica)
 SORTKEY (cod_dw_direccion_fisica);
 
+-- SLCOPRBA-1355: gana cod_suscriptor, espejo de la columna que
+-- v_xpm_reporte_relacion_persona_ubica expone en crudo. DROP + CREATE porque
+-- CREATE TABLE IF NOT EXISTS no anade columnas a una tabla ya existente.
+DROP TABLE IF EXISTS bdm_stage.reporte_relacion_persona_ubica;
 CREATE TABLE IF NOT EXISTS bdm_stage.reporte_relacion_persona_ubica (
   cod_dw_persona_ubic BIGINT,
   id_buro_suscriptor  INTEGER,
+  cod_suscriptor      VARCHAR(20),
   fecha_reporte       DATE
 )
 DISTSTYLE KEY DISTKEY (cod_dw_persona_ubic)
@@ -193,7 +198,8 @@ CREATE TABLE IF NOT EXISTS bdm_stage.contacto_canal (
   cod_dane_ciudad         INTEGER,
   fecha_contacto          DATE,
   id_buro_suscriptor      INTEGER,
-  cod_tipo_cta_fte        VARCHAR(20)
+  cod_tipo_cta_fte        VARCHAR(20),
+  cod_suscriptor          VARCHAR(20)
 )
 DISTSTYLE KEY DISTKEY (id_buro_persona)
 SORTKEY (id_buro_persona, contact_type);

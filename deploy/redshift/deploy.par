@@ -25,3 +25,4 @@
 20_ddl_cert_criterios_ord.sql
 21_ddl_catalogos_dominio.sql
 22_ddl_catalogo_tipo_cuenta_ord.sql
+23_ddl_catalogo_portafolio_ord.sql

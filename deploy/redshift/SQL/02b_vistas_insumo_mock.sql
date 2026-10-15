@@ -237,6 +237,7 @@ CREATE OR REPLACE VIEW bdm_tempo.v_mock_reporte_relacion_persona_ubica AS
 SELECT
   cod_dw_persona_ubic,
   id_buro_suscriptor,
+  cod_suscriptor,
   fecha_reporte
 FROM bdm_stage.reporte_relacion_persona_ubica
 WITH NO SCHEMA BINDING;
@@ -305,6 +306,7 @@ SELECT
   cod_dane_ciudad,
   fecha_contacto,
   id_buro_suscriptor,
-  cod_tipo_cta_fte
+  cod_tipo_cta_fte,
+  cod_suscriptor
 FROM bdm_stage.contacto_canal
 WITH NO SCHEMA BINDING;

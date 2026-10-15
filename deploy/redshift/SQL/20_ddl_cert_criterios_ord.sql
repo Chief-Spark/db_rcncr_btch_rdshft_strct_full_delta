@@ -240,7 +240,7 @@ FROM (
          'legado Caracteristicas.txt:241 (origen :226, :172)' UNION ALL
   SELECT 'F4-DIR-03','FASE4','Alta','CONSULTA',
          'DIR009 = entidades distintas reportando la direccion.',
-         'legado Caracteristicas.txt:201; unico DIR con prefijo CO01' UNION ALL
+         'DIVERGENCIA DEL RF (SLCOPRBA-1355): DIR009 no cuenta entidades. Caracteristicas.txt:201 no lleva un solo DISTINCT: cuenta CUANTAS DIRECCIONES DE LA PERSONA tienen al menos un reporte CRR, via CO00DIR016 > 0. Es ademas a grano de PERSONA -- el join de :201 es solo por Id_Buro_Persona -- y se reparte igual a todas sus direcciones. Se evalua sobre esa magnitud. Sigue siendo el unico DIR con prefijo CO01. Para bitacora G-03.' UNION ALL
   SELECT 'F4-DIR-04','FASE4','Alta','CONSULTA',
          'DIR017 = tipo ubicacion (RES=1, LAB=2, CRR=3).',
          'DIVERGENCIA DEL RF: en el legado (Caracteristicas.txt:147) DIR015 cuenta RES, DIR016 cuenta CRR y DIR017 cuenta LAB. Son tres contadores, no un codigo. Ademas las etiquetas de salida Laboral y Correspondecia estan cruzadas en Orden_Direcc (:159). Para bitacora G-03.' UNION ALL
@@ -255,13 +255,13 @@ FROM (
          'sp_ordenamiento_scoring_tel_edf; 11 calculadas, 10 en la suma (TEL020 fuera, igual que el legado)' UNION ALL
   SELECT 'F4-TEL-02','FASE4','Alta','CONSULTA',
          'TEL010 = porcentaje de reportes con coincidencia geografica.',
-         'legado Caracteristicas.txt:249. En Redshift coincidencia_geo esta fijada a 0 (preparar_insumos_edf:234), de modo que TEL010 es constante' UNION ALL
+         'DIVERGENCIA DEL RF (SLCOPRBA-1355): TEL010 no mira la coincidencia geografica. Caracteristicas.txt:249 no referencia la columna COINCIDENCIA en ningun sitio: es la cuota de los reportes de los ULTIMOS 12 MESES que son de este telefono, sobre Total_Reportes_12. Los umbrales 20/50/70 de su _cat confirman la lectura de porcentaje y descartan la de bandera. Ya esta portada asi. Para bitacora G-03.' UNION ALL
   SELECT 'F4-TEL-03','FASE4','Alta','CONSULTA',
          'TEL020 = indicador binario de coincidencia geografica (1 si no tiene, 4 si tiene).',
-         'legado Caracteristicas.txt:174 y :37. Confirmado FUERA de la suma (:238): la paridad es deliberada' UNION ALL
+         'legado Caracteristicas.txt:174 y :37. Confirmado FUERA de la suma (:238), que suma diez terminos -- TEL001/002/003/006/007/010/017/019/023/025 -- y no incluye TEL020_Peso, igual que tampoco incluye TEL022. Nuestro port lo respeta (scoring_tel_edf.sql:148). La paridad es deliberada y es lo que se certifica.' UNION ALL
   SELECT 'F4-TEL-04','FASE4','Alta','CONSULTA',
          'Solo se deben considerar reportes validos (se excluyen los marcados como NO VALIDA).',
-         'legado Caracteristicas.txt:46 y :160. En Redshift NO excluye: degrada el numerador (scoring_tel_edf:30-38)' UNION ALL
+         'CORREGIDO (SLCOPRBA-1355): nuestro codigo SI excluye, en los cinco contadores de TEL (scoring_tel_edf.sql:37, 41, 57, 72, 74). Y en el legado este filtro es CODIGO MUERTO: Descripcion_Gestion_Registro se cablea al literal Valida (Prc_Ordenamiento2.sql:1295) y el WHERE de :1298 excluye fisicamente cualquier otra gestion, de modo que NO VALIDA no puede existir y los 15 predicados del legado siempre son ciertos. El legado excluye aguas arriba por catalogo de gestion; nosotros sintetizamos la validez del propio numero. Misma intencion, distinta definicion de invalido. Para bitacora G-03.' UNION ALL
   SELECT 'F4-TEL-05','FASE4','Alta','CONSULTA',
          'Los Betas utilizados deben tener prefijo CO01TEL.',
          '02_carga_betas_ritm5226589.sql: 11 CO01TEL' UNION ALL

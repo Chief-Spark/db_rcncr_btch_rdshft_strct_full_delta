@@ -49,6 +49,19 @@ SELECT
     END,
     MOD(ABS(FNV_HASH(xpm.pin || ':' || ci.id::VARCHAR)), 9998) + 1
   ) AS id_buro_suscriptor,
+  -- SLCOPRBA-1355: el codigo de suscriptor EN CRUDO, aparte de
+  -- id_buro_suscriptor. Las dos columnas NO son la misma cosa: id_buro_suscriptor
+  -- es un COALESCE cuyo ultimo recurso es una cubeta de hash
+  -- (MOD(ABS(FNV_HASH(...)), 9998) + 1), y un hash no tiene prefijo de
+  -- industria. El clasificador Portafolio_Nuevo del legado parte del PREFIJO
+  -- DE DOS DIGITOS de este codigo (PRO_ORD_CTA_TOTALES_PERSONAS_2.sql:378-389),
+  -- asi que necesita el valor real o nada.
+  --   VARCHAR(20) y no INTEGER: el legado le aplica SUBSTR(cod_suscriptor,1,2),
+  --   que es semantica de caracter, y castear repetiria el job #293.
+  --   Es NULL cuando el datashare no trae el dato, y entonces el portafolio
+  --   cae a 'OT', que es la rama ELSE del legado.
+  CAST(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') AS VARCHAR(20))
+    AS cod_suscriptor,
   -- SLCOPRBA-1355: el tipo de cuenta que reporto este contacto.
   -- El legado lo trae a la fila de contacto con un join por Cod_DW_Cta
   -- (Caracteristicas.txt:112). Aqui ese join NO hace falta: una fila de
