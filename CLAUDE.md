@@ -56,6 +56,15 @@ cd dt/banco && ./banco.sh init nueva && ./banco.sh fase strct
 ./banco.sh foto tras_pgm      # y ./banco.sh desde tras_pgm para re-correr en 2 s
 ```
 
+**EL BANCO YA NO ES EL GATE.** Desde que el pipeline de Jenkins despliega y
+corre la bateria **en Redshift real** (job DEV/DATABASE #370: e2e completo,
+tablero y asercion final), la prueba que manda es esa. El banco se queda como
+**chequeo previo de dos minutos** -- `./banco.sh fase pgm`, que compila los 74
+archivos y verifica los 80 objetos -- y ahi es donde sigue siendo rentable:
+caza en dos minutos lo que en Jenkins cuesta commit, push, traslado y job, y
+sin dejar DEV a medias. La bateria larga de 45 minutos se corre cuando
+interesa una hipotesis barata, no para certificar.
+
 **Un verde del banco NO certifica.** Degrada un `[REDSHIFT:112]` de
 "desconocido" a "especifico de Redshift". Postgres es mas permisivo que Redshift
 en cinco formas y mas estricto en tres; `banco/README.md` las lista una por una,
@@ -97,6 +106,14 @@ conserva su nombre en `RevSQL/`.
 - Tablas pequenas en `DISTSTYLE ALL`, con la justificacion escrita.
 - **Paridad real <-> mock** en todo SP que se toque. El mock se genera por
   sustitucion de fuentes y debe regenerarse identico.
+  **CUALES TIENEN ESPEJO Y CUALES NO, que es donde se falla:**
+  `sp_ordenamiento_preparar_insumos_edf` **SI** tiene su `_mock`; los cuatro
+  `sp_ordenamiento_scoring_*_edf` y `sp_ordenamiento_consolidacion_edf`
+  **NO** -- el mock reutiliza los reales. Anadir una columna al insumo real
+  y no al espejo tumba la bateria entera en el primer ciclo con
+  `column "..." does not exist`, y pasa `validar.sh` sin una queja porque es
+  un error semantico, no de sintaxis. Ya se pago (SLCOPRBA-1355). El
+  `diff` de la rama tocada entre los dos archivos tiene que salir vacio.
 
 ## Trampas de Redshift ya pagadas
 
