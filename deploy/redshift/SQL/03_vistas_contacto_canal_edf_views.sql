@@ -48,7 +48,23 @@ SELECT
       ELSE NULL
     END,
     MOD(ABS(FNV_HASH(xpm.pin || ':' || ci.id::VARCHAR)), 9998) + 1
-  ) AS id_buro_suscriptor
+  ) AS id_buro_suscriptor,
+  -- SLCOPRBA-1355: el tipo de cuenta que reporto este contacto.
+  -- El legado lo trae a la fila de contacto con un join por Cod_DW_Cta
+  -- (Caracteristicas.txt:112). Aqui ese join NO hace falta: una fila de
+  -- xpm_location YA ES "este suscriptor reporto este contacto para esta
+  -- cuenta", que es el mismo grano que el legado consigue uniendo.
+  --
+  -- VARCHAR(20), NO INTEGER, por dos razones. En el legado la columna es de
+  -- caracter -- todas sus referencias la envuelven en CAST(... AS INTEGER),
+  -- y una de las cinco ramas de CO01EMA021 (Caracteristicas.txt:235) la
+  -- compara en texto crudo contra '23'. Y porque castear aqui repetiria el
+  -- job #293: un valor de mas de 10 digitos aborta con "Value out of range
+  -- for 4 bytes" aunque pase el guardia de solo-digitos (ver la nota de
+  -- personidtype en 02_vistas_insumo_edf_views.sql:89-98).
+  -- Consumidores: CO01CEL019 (via catalogo_tipo_cuenta_ord) y CO01EMA021.
+  CAST(NULLIF(TRIM(loc."location.val.accounttype"::VARCHAR), '') AS VARCHAR(20))
+    AS cod_tipo_cta_fte
 FROM ds_dba_rncr_batch.edf_views.xpm xpm
 INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location loc
   ON xpm.location = loc.id

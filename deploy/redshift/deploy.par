@@ -24,3 +24,4 @@
 12_ddl_unif_convergencia_mock.sql
 20_ddl_cert_criterios_ord.sql
 21_ddl_catalogos_dominio.sql
+22_ddl_catalogo_tipo_cuenta_ord.sql

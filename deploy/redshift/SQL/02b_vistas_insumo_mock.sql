@@ -304,6 +304,7 @@ SELECT
   texto_ubicacion_vinculo,
   cod_dane_ciudad,
   fecha_contacto,
-  id_buro_suscriptor
+  id_buro_suscriptor,
+  cod_tipo_cta_fte
 FROM bdm_stage.contacto_canal
 WITH NO SCHEMA BINDING;

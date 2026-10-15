@@ -273,7 +273,7 @@ FROM (
          'scoring_cel_edf:32. Los prefijos estan HARDCODEADOS en el SP y duplican el catalogo catalogo_tipo_cuenta_tel, que los marca PREPAGO' UNION ALL
   SELECT 'F4-CEL-03','FASE4','Alta','CONSULTA',
          'CEL014 = indicador de si la persona tiene cuenta POSPAGO.',
-         'scoring_cel_edf; legado Caracteristicas.txt:205' UNION ALL
+         'DIVERGENCIA DEL RF, REAPUNTADA (SLCOPRBA-1355): CEL014 no mira el tipo de cuenta -- es la cuota de reportes de mas de 24 meses (Caracteristicas.txt:2450-2453). La que SI depende del tipo de cuenta es CEL019: MAX del peso de V_Tipo_Cuenta_Ord (:112). El criterio se evalua ahora sobre CEL019, que es donde vive el enunciado. Para bitacora G-03.' UNION ALL
   SELECT 'F4-CEL-04','FASE4','Alta','CONSULTA',
          'CEL018 = valor del operador segun tabla de mapeo V_Operador_Ord_Cel.',
          'legado Caracteristicas.txt:80, lookup por SUBSTR(texto,1,3). En Redshift: bdm_datos.catalogo_operador_ord_cel (interim DEV)' UNION ALL

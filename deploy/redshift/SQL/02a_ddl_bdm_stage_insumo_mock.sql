@@ -177,6 +177,12 @@ SORTKEY (id_buro_persona, cod_dw_ubic);
 -- aceptacion que exigen scores en TEL/CEL/EMA no tendrian como cumplirse.
 -- contact_type sigue la codificacion del datashare: '4','5','8' = telefono fijo,
 -- '9' = celular; el resto se interpreta como correo en el insumo EMA.
+-- SLCOPRBA-1355: se anade cod_tipo_cta_fte, espejo de la columna
+-- accounttype de xpm_location que v_xpm_contacto_canal ya expone.
+-- DROP + CREATE porque CREATE TABLE IF NOT EXISTS no anade columnas a una
+-- tabla ya existente y Redshift no admite ALTER TABLE ADD COLUMN IF EXISTS.
+-- Es una tabla de semillas mock: no hay dato productivo que perder.
+DROP TABLE IF EXISTS bdm_stage.contacto_canal;
 CREATE TABLE IF NOT EXISTS bdm_stage.contacto_canal (
   cod_dw_persona_ubic     BIGINT,
   id_buro_persona         BIGINT,
@@ -186,7 +192,8 @@ CREATE TABLE IF NOT EXISTS bdm_stage.contacto_canal (
   texto_ubicacion_vinculo VARCHAR(500),
   cod_dane_ciudad         INTEGER,
   fecha_contacto          DATE,
-  id_buro_suscriptor      INTEGER
+  id_buro_suscriptor      INTEGER,
+  cod_tipo_cta_fte        VARCHAR(20)
 )
 DISTSTYLE KEY DISTKEY (id_buro_persona)
 SORTKEY (id_buro_persona, contact_type);
