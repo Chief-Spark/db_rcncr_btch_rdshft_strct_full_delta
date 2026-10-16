@@ -1,16 +1,16 @@
 -- ============================================================
 -- 02_carga_betas_ritm5226589.sql
--- Catálogo bdm_datos.beta_ordenamiento desde Teradata REC_VISTA
+-- Catalogo bdm_datos.beta_ordenamiento desde Teradata REC_VISTA
 -- Fuente: LogRITM5226589.txt (John Bueno, 2026-09-15)
 -- Vistas: V_Beta_Ordenamiento_Tel / Cel / Email / Dir
--- Acuerdo sesión/mesa: betas = coeficientes en tablas auxiliares/catálogos
--- Decimal EU en el log (114,09942950) → 114.09942950
+-- Acuerdo sesion/mesa: betas = coeficientes en tablas auxiliares/catalogos
+-- Decimal EU en el log (114,09942950) -> 114.09942950
 -- Reemplaza 02_mock_betas.sql (valores ~0.1 eran placeholder)
 -- ============================================================
 
 TRUNCATE TABLE bdm_datos.beta_ordenamiento;
 
--- TEL (11) — Beta_Ord_Tel
+-- TEL (11) - Beta_Ord_Tel
 INSERT INTO bdm_datos.beta_ordenamiento (canal, cod_caracteristica, valor_beta) VALUES
   ('TEL', 'CO01TEL001', 114.09942950),
   ('TEL', 'CO01TEL019',  68.45965770),
@@ -24,7 +24,7 @@ INSERT INTO bdm_datos.beta_ordenamiento (canal, cod_caracteristica, valor_beta) 
   ('TEL', 'CO01TEL020', 136.91931540),
   ('TEL', 'CO01TEL010',  61.93969030);
 
--- CEL (11) — Beta_Ord_Cel
+-- CEL (11) - Beta_Ord_Cel
 INSERT INTO bdm_datos.beta_ordenamiento (canal, cod_caracteristica, valor_beta) VALUES
   ('CEL', 'CO01CEL014', 124.48132780),
   ('CEL', 'CO01CEL018', 153.52697100),
@@ -38,7 +38,7 @@ INSERT INTO bdm_datos.beta_ordenamiento (canal, cod_caracteristica, valor_beta) 
   ('CEL', 'CO01CEL019', 186.72199170),
   ('CEL', 'CO01CEL020', 203.31950210);
 
--- EMA (13) — Beta_Ord_Mail
+-- EMA (13) - Beta_Ord_Mail
 INSERT INTO bdm_datos.beta_ordenamiento (canal, cod_caracteristica, valor_beta) VALUES
   ('EMA', 'CO01EMA017', -30.56079051),
   ('EMA', 'CO01EMA020',  61.12158101),
@@ -54,7 +54,7 @@ INSERT INTO bdm_datos.beta_ordenamiento (canal, cod_caracteristica, valor_beta) 
   ('EMA', 'CO01EMA023', 180.30866400),
   ('EMA', 'CO01EMA015',  79.45805532);
 
--- DIR (12) — Beta_Ord_Dir
+-- DIR (12) - Beta_Ord_Dir
 INSERT INTO bdm_datos.beta_ordenamiento (canal, cod_caracteristica, valor_beta) VALUES
   ('DIR', 'CO00DIR050TO', 100.64516130),
   ('DIR', 'CO00DIR059',   135.48387100),
@@ -74,4 +74,4 @@ SELECT canal, COUNT(*) AS n, MIN(valor_beta) AS min_b, MAX(valor_beta) AS max_b
 FROM bdm_datos.beta_ordenamiento
 GROUP BY 1
 ORDER BY 1;
--- Esperado: DIR=12, TEL=11, CEL=11, EMA=13 → total 47
+-- Esperado: DIR=12, TEL=11, CEL=11, EMA=13 -> total 47

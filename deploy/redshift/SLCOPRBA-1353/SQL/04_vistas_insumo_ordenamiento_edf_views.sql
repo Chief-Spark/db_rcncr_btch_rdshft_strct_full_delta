@@ -1,7 +1,7 @@
 -- ============================================================
 -- 04_vistas_sin_copia_productor.sql
--- Reemplaza materialización de RPU e insumos: lectura vía datashare.
--- PRECONDICIÓN: unificación ejecutada (unificacion_direccion poblada).
+-- Reemplaza materializacion de RPU e insumos: lectura via datashare.
+-- PRECONDICION: unificacion ejecutada (unificacion_direccion poblada).
 -- ============================================================
 
 -- Salida ordenamiento: solo prioridad por RPU (no copiar universo XPM)
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS bdm_datos.rpu_orden_prioridad (
 DISTSTYLE KEY DISTKEY(id_buro_persona)
 SORTKEY(cod_dw_persona_ubic);
 
--- RPU post-unificación: vista sobre productor + flag local de unificación
+-- RPU post-unificacion: vista sobre productor + flag local de unificacion
 DROP VIEW IF EXISTS bdm_tempo.v_rpu_post_unificacion;
 CREATE OR REPLACE VIEW bdm_tempo.v_rpu_post_unificacion AS
 SELECT
@@ -36,7 +36,7 @@ LEFT JOIN (
   ON op.cod_dw_persona_ubic = rpu.cod_dw_persona_ubic
 WITH NO SCHEMA BINDING;
 
--- Compatibilidad: nombre histórico usado en validaciones
+-- Compatibilidad: nombre historico usado en validaciones
 DROP VIEW IF EXISTS bdm_tempo.v_relacion_persona_ubicacion_ord;
 CREATE OR REPLACE VIEW bdm_tempo.v_relacion_persona_ubicacion_ord AS
 SELECT * FROM bdm_tempo.v_rpu_post_unificacion
@@ -55,7 +55,7 @@ DROP VIEW IF EXISTS bdm_datos.insumo_telefono;
 DROP VIEW IF EXISTS bdm_datos.insumo_celular;
 DROP VIEW IF EXISTS bdm_datos.insumo_email;
 
--- ── Insumo DIR (vista = lógica de sp_ordenamiento_preparar_insumos_edf) ──
+-- -- Insumo DIR (vista = logica de sp_ordenamiento_preparar_insumos_edf) --
 CREATE OR REPLACE VIEW bdm_datos.insumo_direccion AS
 SELECT
   rpu.cod_dw_persona_ubic,
@@ -90,7 +90,7 @@ INNER JOIN (
 WHERE COALESCE(rpu.ind_unificacion, 0) <> 1
 WITH NO SCHEMA BINDING;
 
--- ── Insumo TEL ──
+-- -- Insumo TEL --
 CREATE OR REPLACE VIEW bdm_datos.insumo_telefono AS
 SELECT
   c.cod_dw_persona_ubic,
@@ -126,7 +126,7 @@ WHERE c.contact_type IN ('4', '5', '8')
   AND c.valor_contacto IS NOT NULL
 WITH NO SCHEMA BINDING;
 
--- ── Insumo CEL ──
+-- -- Insumo CEL --
 CREATE OR REPLACE VIEW bdm_datos.insumo_celular AS
 SELECT
   c.cod_dw_persona_ubic,
@@ -158,7 +158,7 @@ WHERE c.contact_type = '9'
   AND c.valor_contacto IS NOT NULL
 WITH NO SCHEMA BINDING;
 
--- ── Insumo EMA ──
+-- -- Insumo EMA --
 CREATE OR REPLACE VIEW bdm_datos.insumo_email AS
 SELECT
   c.cod_dw_persona_ubic,

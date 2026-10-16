@@ -1,7 +1,7 @@
 -- ============================================================
 -- 02b_vistas_insumo_mock.sql
 -- Insumo MOCK para SPs sp_unificacion_mock_*
--- Fuente: bdm_stage (seed / suite TC) — NO lee edf_views / DS real
+-- Fuente: bdm_stage (seed / suite TC) - NO lee edf_views / DS real
 -- Los SPs reales siguen en 02_vistas_insumo_edf_views.sql (v_xpm_*)
 -- ============================================================
 

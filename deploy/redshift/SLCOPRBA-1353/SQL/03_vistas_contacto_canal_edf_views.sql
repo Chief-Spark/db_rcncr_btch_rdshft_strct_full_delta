@@ -89,7 +89,7 @@ WHERE NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR
   ('1','2','3','4','5','7','8','9','10')
 WITH NO SCHEMA BINDING;
 
--- Personas con DIR ganadora post-unificación (vista; no tabla local)
+-- Personas con DIR ganadora post-unificacion (vista; no tabla local)
 -- NOTA: tras 04_vistas_sin_copia_productor.sql se redefine sobre v_rpu_post_unificacion
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_persona_dir_ganadora AS
 SELECT DISTINCT id_buro_persona

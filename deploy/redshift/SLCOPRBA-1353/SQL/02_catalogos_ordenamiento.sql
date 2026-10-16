@@ -1,5 +1,5 @@
--- Catálogos ordenamiento — interim DEV hasta IFR/datashare oficial
--- Reemplazar carga sector_financiero cuando IFR entregue catálogo
+-- Catalogos ordenamiento - interim DEV hasta IFR/datashare oficial
+-- Reemplazar carga sector_financiero cuando IFR entregue catalogo
 
 CREATE TABLE IF NOT EXISTS bdm_datos.catalogo_sector_financiero (
   id_buro_suscriptor INTEGER ENCODE AZ64,
@@ -31,7 +31,7 @@ INSERT INTO bdm_datos.catalogo_tipo_cuenta_tel VALUES
   ('300', 'PREPAGO'), ('301', 'PREPAGO'), ('302', 'PREPAGO'), ('350', 'PREPAGO'),
   ('601', 'FIJA'), ('602', 'FIJA'), ('604', 'FIJA');
 
--- Catálogo operador celular (interim DEV — reemplazar por ifr_data.v_operador_ord_cel)
+-- Catalogo operador celular (interim DEV - reemplazar por ifr_data.v_operador_ord_cel)
 CREATE TABLE IF NOT EXISTS bdm_datos.catalogo_operador_ord_cel (
   cod_operador VARCHAR(3) ENCODE ZSTD,
   operador     VARCHAR(50) ENCODE ZSTD,

@@ -1,7 +1,7 @@
 -- ============================================================
 -- 02a_ddl_bdm_stage_insumo_mock.sql
 -- Tablas base bdm_stage que alimentan v_mock_* (suite mock unif).
--- CREATE IF NOT EXISTS — no inventa datos; el seed opcional va en dt.
+-- CREATE IF NOT EXISTS - no inventa datos; el seed opcional va en dt.
 -- UTF-8 sin BOM. Nunca GRANT TO PUBLIC.
 -- ============================================================
 
@@ -12,7 +12,7 @@ CREATE SCHEMA IF NOT EXISTS bdm_stage;
 -- POR QUE DROP + CREATE Y NO ALTER: Redshift no admite
 -- ADD COLUMN IF NOT EXISTS, y CREATE TABLE IF NOT EXISTS no altera una tabla
 -- que ya existe, de modo que un ALTER plano funcionaria la primera vez y
--- rompería el despliegue en todos los siguientes con "column already exists".
+-- romperia el despliegue en todos los siguientes con "column already exists".
 -- Recrear es seguro AQUI y solo aqui porque esta tabla es scaffolding de mock:
 -- no guarda nada que no regenere el seed. reset_mock la trunca y
 -- seed_mock_matriz la repuebla completa en cada corrida de la bateria.

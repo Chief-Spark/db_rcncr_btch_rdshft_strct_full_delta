@@ -1,8 +1,8 @@
 -- ============================================================
 -- 00_vistas_insumo_bdm.sql  (DEV / edf_views)
--- Capa XPM edf_views â†’ insumo BDM para UnificaciÃ³n R1/R2/R3
+-- Capa XPM edf_views -> insumo BDM para Unificacion R1/R2/R3
 -- Diferencia vs ifr_data: sin columna relationalizelastupdate en JOINs
--- Sanitiza strings vacÃ­os / IDs fuera de rango INTEGER (edf_views DEV)
+-- Sanitiza strings vacios / IDs fuera de rango INTEGER (edf_views DEV)
 -- ============================================================
 
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_ciiu_persona;

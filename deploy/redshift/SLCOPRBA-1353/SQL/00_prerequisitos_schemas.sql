@@ -1,7 +1,7 @@
 -- ============================================================
 -- 00_prerequisitos_dev.sql
--- Consumidor Reconocer DEV — schemas locales + convert_epoch
--- Precondición DBA: CREATE DATABASE ds_dba_rncr_batch FROM DATASHARE ds_reconocer_procesosbatch_dev
+-- Consumidor Reconocer DEV - schemas locales + convert_epoch
+-- Precondicion DBA: CREATE DATABASE ds_dba_rncr_batch FROM DATASHARE ds_reconocer_procesosbatch_dev
 -- ============================================================
 
 CREATE SCHEMA IF NOT EXISTS bdm_datos;

@@ -1,5 +1,5 @@
 -- ============================================================
--- 01_ddl_ordenamiento.sql — Reconocer DEV / datashare edf_views
+-- 01_ddl_ordenamiento.sql - Reconocer DEV / datashare edf_views
 -- id_buro_persona BIGINT (FNV_HASH real)
 -- ============================================================
 
