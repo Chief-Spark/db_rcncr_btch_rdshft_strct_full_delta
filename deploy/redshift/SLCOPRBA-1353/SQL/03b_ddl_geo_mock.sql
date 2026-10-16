@@ -17,17 +17,26 @@
 --   excluiria el universo entero y el mock jamas generaria un solo candidato.
 --   Con tablas separadas la certificacion GEO mock es independiente y repetible.
 --
--- ALCANCE: solo generacion de candidatos (exportacion). NO hay
--- geo_distancias_mock porque las distancias alimentan la Regla 3, que queda
--- fuera del alcance de la certificacion mock (no hay enriquecimiento de
--- coordenadas disponible).
+-- ALCANCE (AMPLIADO, SLCOPRBA-1355): el ciclo GEO mock completo --
+-- exportacion, carga de georreferenciacion y reenganche de la Regla 3 -- sin
+-- tocar S3. Antes solo cubria la generacion de candidatos. Sigue sin haber
+-- geo_distancias_mock: las distancias no entran en ninguno de los cinco
+-- criterios GEO.
 --
--- COMPORTAMIENTO ESPERADO DEL UNLOAD: debe FALLAR. El rol IAM
--- arn:aws:iam::<cuenta>:role/rcncr-batch-redshift-geo no esta asociado al
--- cluster DEV. El fallo de exportacion NO es bloqueante por diseno (Req 2.10,
--- 2.11): el Lote queda 'fallido' en geo_lote_control_mock y el flujo continua
--- con R1+R2 hacia Ordenamiento. Eso es resultado esperado de la prueba, no un
--- defecto.
+-- EL VIAJE A S3 SE SALTA, NO SE SIMULA MAL. Dos piezas lo sustituyen:
+--   1. el parametro s3_enabled, que en la via mock vale '0' y hace que
+--      sp_geo_exportar_insumo_mock OMITA el UNLOAD y deje el Lote en
+--      'exportado' en vez de 'fallido';
+--   2. bdm_stage.mock_geo_respuesta, que ES el archivo de vuelta de
+--      ArcGIS_Externo, columna por columna, y que sp_geo_cargar_
+--      georreferenciacion_mock lee con un INSERT en lugar del COPY.
+--
+-- LO QUE ESTO NO CERTIFICA, y hay que decirlo: que el UNLOAD escriba de
+-- verdad en S3 y que el COPY lo lea. Son dos sentencias cuyo riesgo es de
+-- permisos (el rol arn:aws:iam::<cuenta>:role/rcncr-batch-redshift-geo no
+-- esta asociado al cluster DEV), no de logica. Todo lo demas -- gate de
+-- estado, gate de conteo, conciliacion de tipos, rechazos, los tres UPDATE a
+-- geo_atributos y la maquina de estados del Lote -- es el mismo SQL.
 -- ============================================================
 
 CREATE SCHEMA IF NOT EXISTS bdm_datos;
@@ -157,3 +166,88 @@ FROM (
   SELECT 'DEV',  'retry_backoff_seconds','300'
 ) v
 WHERE NOT EXISTS (SELECT 1 FROM bdm_datos.geo_config_mock LIMIT 1);
+
+-- ------------------------------------------------------------
+-- bdm_stage.mock_geo_respuesta -- PERMANENTE (SLCOPRBA-1355)
+-- ES EL ARCHIVO DE VUELTA de ArcGIS_Externo, columna por columna: las mismas
+-- 32 columnas VARCHAR crudas de Salida_Georreferenciacion que el COPY real
+-- deposita en bdm_tempo.stg_arcgis_georeferenciacion. Que tenga la MISMA
+-- forma es lo que permite que sp_geo_cargar_georreferenciacion_mock difiera
+-- del real en una sola sentencia: el COPY pasa a ser un INSERT ... SELECT
+-- desde aqui, y todo el SQL de abajo (conciliacion de tipos, rechazos,
+-- UPDATEs) es identico.
+--
+-- Del contrato de 32 columnas, el cargador solo lee cinco:
+--   col01 Cod_DW_Ubic | col02 Lote | col03 Status (M/U)
+--   col05 Latitud     | col06 Longitud
+-- Las otras 27 existen para que la forma coincida; van NULL.
+--
+-- col02 es la llave de filtrado: el cargador toma del "archivo" solo las
+-- filas cuyo Lote coincide con el que esta procesando, igual que el contrato
+-- 1:1 por Lote del camino real.
+--
+-- DISTSTYLE EVEN como el staging real, que tampoco distribuye por clave.
+-- ------------------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS bdm_stage;
+
+CREATE TABLE IF NOT EXISTS bdm_stage.mock_geo_respuesta (
+  col01  VARCHAR(500),   -- Cod_DW_Ubic
+  col02  VARCHAR(500),   -- Lote
+  col03  VARCHAR(500),   -- Status (M | U)
+  col04  VARCHAR(500),
+  col05  VARCHAR(500),   -- Latitud
+  col06  VARCHAR(500),   -- Longitud
+  col07  VARCHAR(500),
+  col08  VARCHAR(500),
+  col09  VARCHAR(500),
+  col10  VARCHAR(500),
+  col11  VARCHAR(500),
+  col12  VARCHAR(500),
+  col13  VARCHAR(500),
+  col14  VARCHAR(500),
+  col15  VARCHAR(500),
+  col16  VARCHAR(500),
+  col17  VARCHAR(500),
+  col18  VARCHAR(500),
+  col19  VARCHAR(500),
+  col20  VARCHAR(500),
+  col21  VARCHAR(500),
+  col22  VARCHAR(500),
+  col23  VARCHAR(500),
+  col24  VARCHAR(500),
+  col25  VARCHAR(500),
+  col26  VARCHAR(500),
+  col27  VARCHAR(500),
+  col28  VARCHAR(500),
+  col29  VARCHAR(500),
+  col30  VARCHAR(500),
+  col31  VARCHAR(500),
+  col32  VARCHAR(500)
+)
+DISTSTYLE EVEN;
+
+-- ------------------------------------------------------------
+-- s3_enabled: el interruptor que separa la via mock de S3.
+--
+-- VA EN UN INSERT APARTE A PROPOSITO. El seed de arriba se protege con
+-- WHERE NOT EXISTS (... FROM geo_config_mock LIMIT 1), que mira si la tabla
+-- tiene ALGUNA fila; sobre un ambiente donde ya se desplego, ese guarda es
+-- cierto y un parametro nuevo anadido alli NO se insertaria jamas. El guarda
+-- de aqui es por parametro, que es el que corresponde cuando se agrega uno.
+--
+-- Vale '0' en los cuatro ambientes: la via mock nunca escribe en S3. El
+-- camino REAL no mira este parametro, de modo que su comportamiento no
+-- cambia.
+-- ------------------------------------------------------------
+INSERT INTO bdm_datos.geo_config_mock (ambiente, parametro, valor)
+SELECT v.ambiente, v.parametro, v.valor
+FROM (
+  SELECT 'PROD' AS ambiente, 's3_enabled' AS parametro, '0' AS valor UNION ALL
+  SELECT 'UAT',  's3_enabled', '0'                                   UNION ALL
+  SELECT 'TEST', 's3_enabled', '0'                                   UNION ALL
+  SELECT 'DEV',  's3_enabled', '0'
+) v
+WHERE NOT EXISTS (
+  SELECT 1 FROM bdm_datos.geo_config_mock c
+  WHERE c.parametro = 's3_enabled'
+);
