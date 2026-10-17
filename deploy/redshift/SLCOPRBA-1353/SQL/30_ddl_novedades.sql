@@ -33,14 +33,29 @@ CREATE SCHEMA IF NOT EXISTS bdm_tempo;
 -- Contrato tomado de P0035_Extractor_Novedades_130.TPT:28-71 (SCHEMA P0035_8),
 -- menos IN_Severidad, que la calcula la vista de staging y no se persiste.
 --
--- EQUIVALENCIAS DE TIPO Teradata -> Redshift:
---   BYTEINT -> SMALLINT  (Redshift no tiene entero de un byte)
--- DIVERGENCIA DELIBERADA, la unica:
---   numero_reportes y numero_entidades son BYTEINT en el legado y aqui son
---   INTEGER. Son el resultado de un COUNT(*): un BYTEINT desborda a las 128
---   filas. Por esta ruta llegan como 0 literal (ver mas abajo), de modo que
---   el legado nunca lo paga, pero el contrato tiene que soportar el valor
---   real para cuando Ubi_Agregada lo consuma desde la etapa 2.
+-- POLITICA DE TIPOS: MANDAN LOS NATIVOS DE REDSHIFT, NO LOS DEL CONTRATO
+-- TERADATA (decision del equipo, SLCOPRBA-1355).
+--   Lo que se homologa literal es la LOGICA FUNCIONAL; el tipo de la columna
+--   no es logica. Guardar una coordenada como VARCHAR(40) o una fecha como
+--   INTEGER AAAAMMDD es herencia del contrato de archivo plano del legado, y
+--   en Redshift solo impide comparar, ordenar y validar.
+--
+-- | Columna                        | Legado      | Aqui          |
+-- | latitud, longitud              | VARCHAR(40) | DECIMAL(10,6) |
+-- | reportado_desde, ultimo_reporte| INTEGER     | DATE          |
+-- | numero_reportes, _entidades    | BYTEINT     | INTEGER       |
+-- | el resto                       | 1:1 (BYTEINT -> SMALLINT)      |
+--
+--   El DECIMAL(10,6) coincide exacto con bdm_datos.geo_atributos, de modo que
+--   la latitud entra sin CAST.
+--   El INTEGER de los contadores no es cosmetica: son un COUNT(*) y un
+--   BYTEINT desborda a las 128 filas. Por esta ruta llegan como 0 literal,
+--   asi que el legado nunca lo paga, pero el contrato tiene que soportar el
+--   valor real cuando Ubi_Agregada lo consuma desde la etapa 2.
+--
+-- EL FORMATO DE SALIDA NO SE PIERDE: es cosa del UNLOAD, no del
+--   almacenamiento. Si el consumidor exige '20261017' o una coordenada como
+--   texto, se resuelve con TO_CHAR en la sentencia de descarga.
 --
 -- LAS CINCO COLUMNAS QUE EL LEGADO DEJA EN BLANCO POR ESTA RUTA:
 --   reportado_desde, ultimo_reporte, fuente, numero_reportes y
@@ -66,10 +81,10 @@ CREATE TABLE IF NOT EXISTS bdm_tempo.stg_nov_ubica_etapa_9 (
   zona                            VARCHAR(30),
   ciudad                          VARCHAR(30),
   departamento                    VARCHAR(30),
-  longitud                        VARCHAR(40),
-  latitud                         VARCHAR(40),
-  reportado_desde                 INTEGER,      -- NULL literal por esta ruta
-  ultimo_reporte                  INTEGER,      -- NULL literal por esta ruta
+  longitud                        DECIMAL(10,6),
+  latitud                         DECIMAL(10,6),
+  reportado_desde                 DATE,         -- NULL literal por esta ruta
+  ultimo_reporte                  DATE,         -- NULL literal por esta ruta
   fuente                          INTEGER,      -- NULL literal por esta ruta
   numero_reportes                 INTEGER,      -- 0 literal por esta ruta
   numero_entidades                INTEGER,      -- 0 literal por esta ruta
@@ -168,10 +183,10 @@ CREATE TABLE IF NOT EXISTS bdm_datos.mat_info_ubicacion (
   zona                            VARCHAR(30),
   ciudad                          VARCHAR(30),
   departamento                    VARCHAR(30),
-  longitud                        VARCHAR(40),
-  latitud                         VARCHAR(40),
-  reportado_desde                 INTEGER,
-  ultimo_reporte                  INTEGER,
+  longitud                        DECIMAL(10,6),
+  latitud                         DECIMAL(10,6),
+  reportado_desde                 DATE,
+  ultimo_reporte                  DATE,
   fuente                          INTEGER,
   numero_reportes                 INTEGER,
   numero_entidades                INTEGER,
