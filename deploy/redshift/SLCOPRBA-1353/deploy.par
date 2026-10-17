@@ -26,3 +26,8 @@
 21_ddl_catalogos_dominio.sql
 22_ddl_catalogo_tipo_cuenta_ord.sql
 23_ddl_catalogo_portafolio_ord.sql
+30_ddl_novedades.sql
+30b_ddl_novedades_mock.sql
+31_ddl_nov_control.sql
+31b_ddl_nov_control_mock.sql
+33_ddl_cert_criterios_nov.sql
