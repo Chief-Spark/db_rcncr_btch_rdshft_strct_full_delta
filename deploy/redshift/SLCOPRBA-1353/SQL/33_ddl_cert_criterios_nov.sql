@@ -126,17 +126,24 @@ FROM (
          'En modo FULL toda fila debe salir marcada como alta.',
          'Novedad.sql:8392, rama V_CARGA_FULL IS NULL' UNION ALL
   SELECT 'NOV-UB-12', 'UBICACION', 'Alta', 'CONSULTA',
-         'En modo DELTA una relacion nueva desde el watermark debe salir como alta y una modificada como cambio.',
+         'En modo DELTA una relacion nueva desde el watermark debe salir como alta y una modificada como cambio, y la ventana de FECHA debe aportar al menos una fila.',
          'deltas en Novedad.sql:7394-7401 (altas) y :7455-7462 (cambios)' UNION ALL
+  -- CORREGIDO (SLCOPRBA-1355). Decia "una ubicacion bloqueada debe salir
+  -- marcada como baja", que es lo que el legado PARECE hacer y no hace: la
+  -- etapa 1 anti-une V_BLOQUEO y la etapa 9 vuelve a unirla por la misma
+  -- llave, asi que FECHA_BLOQUEO es siempre NULL y 'E' no se emite jamas.
   SELECT 'NOV-UB-13', 'UBICACION', 'Media', 'CONSULTA',
-         'Una ubicacion bloqueada debe salir marcada como baja.',
-         'Novedad.sql:8415' UNION ALL
+         'La baja por bloqueo es codigo muerto en el legado: ninguna fila debe salir marcada como baja.',
+         'Novedad.sql:7590-7594 (anti-join) contra :8393 y :8416 (la rama E)' UNION ALL
   SELECT 'NOV-UB-14', 'UBICACION', 'Alta', 'CONSULTA',
          'La tabla final debe recibir el alta y el cambio por la llave de la fila, sin duplicar.',
          'UPSERT del legado en P0035_Extractor_Novedades_130.TPT:573-703' UNION ALL
+  -- CORREGIDO (SLCOPRBA-1355), hermano de NOV-UB-13: Severidad=2 sale solo de
+  -- FLAG_OP='E' (120.TPT:163), que es codigo muerto, de modo que el UPSERT
+  -- del legado nunca borra. El criterio verifica esa paridad.
   SELECT 'NOV-UB-15', 'UBICACION', 'Alta', 'CONSULTA',
-         'La baja debe borrar la fila de la tabla final por su llave.',
-         'P0035_Extractor_Novedades_130.TPT:703' UNION ALL
+         'El AS-IS solo inserta y actualiza: la tabla final no debe perder filas por una baja que el legado no emite.',
+         'P0035_Extractor_Novedades_120.TPT:163 y 130.TPT:703' UNION ALL
 
   -- ---------- UBICACION: bloqueadas por insumo que no existe ----------
   SELECT 'NOV-UB-16', 'UBICACION', 'Media', 'CONSULTA',
