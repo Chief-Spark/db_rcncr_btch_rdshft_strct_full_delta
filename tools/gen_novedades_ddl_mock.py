@@ -42,3 +42,10 @@ espejo("30_ddl_novedades.sql", "30b_ddl_novedades_mock.sql",
 espejo("34_ddl_nov_actividad_economica.sql", "34b_ddl_nov_actividad_economica_mock.sql",
        ("bdm_tempo.stg_nov_acteco_etapa_1",
         "bdm_datos.mat_info_actividad_economica"))
+
+# UBICACION AGREGADA sufija DOS: la etapa final, que es el traspaso del SP al
+# cargador, y la tabla final. Las otras 21 etapas no son contrato publico y
+# viven dentro del SP, de modo que no hay DDL que reflejar.
+espejo("35_ddl_nov_ubi_agregada.sql", "35b_ddl_nov_ubi_agregada_mock.sql",
+       ("bdm_tempo.stg_nov_ubiagr_etapa_final",
+        "bdm_datos.mat_ubicacion_agregada"))
