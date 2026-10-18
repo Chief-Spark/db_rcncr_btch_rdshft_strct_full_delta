@@ -82,7 +82,7 @@ WHERE rn = 1
 WITH NO SCHEMA BINDING;
 
 -- ------------------------------------------------------------
--- Siembra del catalogo: 41 filas (32 menos NOV-HIS-01, mas los diez NOV-AE).
+-- Siembra del catalogo: 48 filas (41 menos NOV-AGR-01, mas los ocho NOV-AG).
 -- El CAST de la primera rama del UNION ALL fija el tipo del nodo, de modo que
 -- la primera fila castea las seis columnas y las demas no lo repiten.
 -- ------------------------------------------------------------
