@@ -14,8 +14,11 @@
 --   la regla 4 del proyecto, y cada uno cita la linea de la que sale.
 --   Si aparece un documento funcional, este catalogo se revisa contra el.
 --
--- ALCANCE DE ESTA ENTREGA: el dominio UBICACION. Los otros siete dominios
---   quedan como NO_IMPLEMENTADO -- visibles, no ausentes.
+-- ALCANCE DE ESTA ENTREGA: los dominios UBICACION y ACTIVIDAD ECONOMICA.
+--   Los otros SEIS dominios quedan como NO_IMPLEMENTADO -- visibles, no
+--   ausentes. NOV-HIS-01 estaba entre ellos y se retiro: era el historial de
+--   actividad economica, que es justo lo que el bloque ACTIVIDAD_ECONOMICA
+--   certifica desde el job DEV/DATABASE #413.
 --   'mosaic' no figura: fuera de alcance por decision legal.
 --
 -- ESTADOS que usa el gate (bdm_datos.cert_resultado_nov.estado): los mismos
@@ -33,8 +36,8 @@ CREATE SCHEMA IF NOT EXISTS bdm_datos;
 -- [REDSHIFT:232].
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS bdm_datos.cert_criterio_nov (
-  criterio     VARCHAR(12)  NOT NULL,   -- NOV-UB-01 .. NOV-G-03
-  bloque       VARCHAR(24)  NOT NULL,   -- UBICACION | OTROS_DOMINIOS | GOBERNANZA
+  criterio     VARCHAR(12)  NOT NULL,   -- NOV-UB-01 .. NOV-AE-10 .. NOV-G-03
+  bloque       VARCHAR(24)  NOT NULL,   -- UBICACION | ACTIVIDAD_ECONOMICA | OTROS_DOMINIOS | GOBERNANZA
   prioridad    VARCHAR(12)  NOT NULL,
   verificable  VARCHAR(16)  NOT NULL,   -- CONSULTA | MANUAL | EXTERNO
   enunciado    VARCHAR(700) NOT NULL,
@@ -76,7 +79,7 @@ WHERE rn = 1
 WITH NO SCHEMA BINDING;
 
 -- ------------------------------------------------------------
--- Siembra del catalogo: 32 filas.
+-- Siembra del catalogo: 41 filas (32 menos NOV-HIS-01, mas los diez NOV-AE).
 -- El CAST de la primera rama del UNION ALL fija el tipo del nodo, de modo que
 -- la primera fila castea las seis columnas y las demas no lo repiten.
 -- ------------------------------------------------------------
@@ -181,15 +184,52 @@ FROM (
   SELECT 'NOV-PIN-01', 'OTROS_DOMINIOS', 'Media', 'CONSULTA',
          'El proceso debe producir los puntos de interes cercanos a cada ubicacion.',
          'legado PRO_Novedad_Linea_Punto_Interes (Novedad.sql:4585). Dominio no portado; falta ademas el nombre del punto de interes, que el contrato de distancias no persiste' UNION ALL
-  SELECT 'NOV-HIS-01', 'OTROS_DOMINIOS', 'Media', 'CONSULTA',
-         'El proceso debe producir el historial de actividad economica.',
-         'legado PRO_Novedad_Linea_Historial (Novedad.sql:1060). Dominio no portado' UNION ALL
   SELECT 'NOV-MOV-01', 'OTROS_DOMINIOS', 'Media', 'CONSULTA',
          'El proceso debe producir los indicadores de movilidad.',
          'legado PRO_Novedad_Linea_Indic_Movilidad (Novedad.sql:1508). Dominio no portado y depende integro del proceso P0029, cuya migracion esta pendiente' UNION ALL
   SELECT 'NOV-AGR-01', 'OTROS_DOMINIOS', 'Alta', 'CONSULTA',
          'El proceso debe producir la ubicacion agregada por persona.',
          'legado PRO_Novedad_Linea_Ubi_Agregada (Novedad.sql:5032). Dominio no portado; es el mayor consumidor de las dos etapas de Ubicacion, con once puntos de lectura' UNION ALL
+
+  -- ---------- ACTIVIDAD ECONOMICA ----------
+  -- Segundo dominio portado. El legado es PRO_Novedad_Linea_Historial
+  -- (Novedad.sql:1060-1420), que a pesar del nombre produce
+  -- MAT_INFO_ACTIVIDAD_ECONOMICA: la nomenclatura del legado esta cruzada y
+  -- manda el 120.TPT, no el nombre. Por eso NOV-HIS-01 desaparecio de
+  -- OTROS_DOMINIOS: decia "dominio no portado" y dejo de ser cierto.
+  --
+  -- Cada criterio cita la linea del legado de la que sale, que es la regla
+  -- de este catalogo: no hay documento funcional de Novedades.
+  SELECT 'NOV-AE-01', 'ACTIVIDAD_ECONOMICA', 'Alta', 'CONSULTA',
+         'La etapa 1 debe exponer las 9 columnas del contrato y la tabla final las 8 del contrato mas las 3 de control, porque el contrato es publico y un CTAS lo cambiaria sin avisar.',
+         'contrato en 34_ddl_nov_actividad_economica.sql; origen en P0035_Extractor_Novedades_120.TPT:176-199' UNION ALL
+  SELECT 'NOV-AE-02', 'ACTIVIDAD_ECONOMICA', 'Alta', 'CONSULTA',
+         'La etapa 1 no debe multiplicar filas por el par (ciiu, info_basica_id): el legado cierra con un QUALIFY ROW_NUMBER sobre ese par.',
+         'QUALIFY en Novedad.sql:1379. La via mock lo necesita de verdad: v_mock_ciiu_persona lee bdm_stage.ciiu_persona SIN DISTINCT' UNION ALL
+  SELECT 'NOV-AE-03', 'ACTIVIDAD_ECONOMICA', 'Alta', 'CONSULTA',
+         'Solo deben entrar personas con CIIU informado: el legado filtra el codigo de actividad no nulo.',
+         'filtro en Novedad.sql:1377; insumo v_xpm_ciiu_persona (02_vistas_insumo_edf_views.sql:364-370)' UNION ALL
+  SELECT 'NOV-AE-04', 'ACTIVIDAD_ECONOMICA', 'Alta', 'CONSULTA',
+         'En modo FULL toda fila debe salir marcada como alta.',
+         'gemelo de NOV-UB-11; el modo decide el flag_op en sp_novedades_actividad_economica_edf.sql' UNION ALL
+  SELECT 'NOV-AE-05', 'ACTIVIDAD_ECONOMICA', 'Alta', 'CONSULTA',
+         'En modo DELTA la ventana debe acotar por FECHA y no solo por la rama de fecha nula: al menos una fila tiene que entrar por fecha.',
+         'gemelo de NOV-UB-12, y por el mismo motivo. La ventana es fecha_reporte >= watermark OR fecha IS NULL (sp_novedades_actividad_economica_edf.sql:149-151): un criterio que solo cuenta filas da PASSED sin haber mirado la ventana, que es lo que tumbo el job DEV/DATABASE #409' UNION ALL
+  SELECT 'NOV-AE-06', 'ACTIVIDAD_ECONOMICA', 'Media', 'CONSULTA',
+         'Las columnas de descripcion de la actividad y de version deben traer el valor del catalogo de CIIU.',
+         'el legado las toma de V_ACTIVIDAD_ECONO_CIIU (Novedad.sql:1352-1354), catalogo que NO se entrego. Peticion en docs/PETICION_CATALOGOS_NOVEDADES.md seccion 6' UNION ALL
+  SELECT 'NOV-AE-07', 'ACTIVIDAD_ECONOMICA', 'Media', 'CONSULTA',
+         'La columna de tipo de identificacion debe traer la descripcion homologada.',
+         'mismo catalogo que bloquea NOV-UB-18: falta V_Hom_Tip_Ident_Linea' UNION ALL
+  SELECT 'NOV-AE-08', 'ACTIVIDAD_ECONOMICA', 'Alta', 'CONSULTA',
+         'El AS-IS de este dominio solo inserta: ninguna fila debe salir marcada como baja y la tabla final no debe perder filas.',
+         'el DELETE del 130.TPT:753 exige Severidad=2 y el CASE de 120.TPT:186-197 no tiene rama que la devuelva: tres ramas dan 1 y el ELSE da -1. Mismo patron que el flag_op=E de Ubicacion' UNION ALL
+  SELECT 'NOV-AE-09', 'ACTIVIDAD_ECONOMICA', 'Alta', 'CONSULTA',
+         'El id de la tabla final se asigna como el maximo vivo mas la posicion de la fila y no puede repetirse.',
+         'Max_ID + SUM(1) OVER (ROWS UNBOUNDED PRECEDING) en 120.TPT:177-179, sobre un CROSS JOIN con COALESCE(MAX(ID),0)' UNION ALL
+  SELECT 'NOV-AE-10', 'ACTIVIDAD_ECONOMICA', 'Alta', 'CONSULTA',
+         'Toda fila con Severidad 1 debe llegar a la tabla final; las de Severidad -1 no.',
+         'filtro Severidad <> -1 en 130.TPT:215; gemelo de NOV-UB-14' UNION ALL
 
   -- ---------- Gobernanza ----------
   SELECT 'NOV-G-01', 'GOBERNANZA', 'Alta', 'CONSULTA',

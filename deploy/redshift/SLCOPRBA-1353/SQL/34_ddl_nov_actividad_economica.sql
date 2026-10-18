@@ -139,7 +139,7 @@ SORTKEY (info_basica_id);
 --
 -- SIN RESTRICCION DE UNICIDAD SOBRE id, aunque sea la llave del UPSERT:
 -- Redshift no las impone y declararla mentiria. La unicidad la verifica el
--- criterio NOV-AE-03 sobre los datos, que es donde se puede comprobar.
+-- criterio NOV-AE-09 sobre los datos, que es donde se puede comprobar.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS bdm_datos.mat_info_actividad_economica (
   id                      INTEGER,
