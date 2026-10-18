@@ -14,11 +14,14 @@
 --   la regla 4 del proyecto, y cada uno cita la linea de la que sale.
 --   Si aparece un documento funcional, este catalogo se revisa contra el.
 --
--- ALCANCE DE ESTA ENTREGA: los dominios UBICACION y ACTIVIDAD ECONOMICA.
---   Los otros SEIS dominios quedan como NO_IMPLEMENTADO -- visibles, no
---   ausentes. NOV-HIS-01 estaba entre ellos y se retiro: era el historial de
---   actividad economica, que es justo lo que el bloque ACTIVIDAD_ECONOMICA
---   certifica desde el job DEV/DATABASE #413.
+-- ALCANCE DE ESTA ENTREGA: los dominios UBICACION, ACTIVIDAD ECONOMICA y
+--   UBICACION AGREGADA. Los otros CINCO quedan como NO_IMPLEMENTADO --
+--   visibles, no ausentes. NOV-HIS-01 y NOV-AGR-01 estaban entre ellos y se
+--   retiraron segun se portaba su dominio: una fila que afirma que algo
+--   falta envejece peor que el codigo.
+--   UBICACION AGREGADA entra con siete de sus ocho criterios en BLOQUEADO:
+--   el dominio emite cero filas hasta que llegue V_Hom_Tip_Ident_Linea, y
+--   el motivo esta escrito entero sobre el bloque.
 --   'mosaic' no figura: fuera de alcance por decision legal.
 --
 -- ESTADOS que usa el gate (bdm_datos.cert_resultado_nov.estado): los mismos
@@ -37,7 +40,7 @@ CREATE SCHEMA IF NOT EXISTS bdm_datos;
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS bdm_datos.cert_criterio_nov (
   criterio     VARCHAR(12)  NOT NULL,   -- NOV-UB-01 .. NOV-AE-10 .. NOV-G-03
-  bloque       VARCHAR(24)  NOT NULL,   -- UBICACION | ACTIVIDAD_ECONOMICA | OTROS_DOMINIOS | GOBERNANZA
+  bloque       VARCHAR(24)  NOT NULL,   -- UBICACION | ACTIVIDAD_ECONOMICA | UBICACION_AGREGADA | OTROS_DOMINIOS | GOBERNANZA
   prioridad    VARCHAR(12)  NOT NULL,
   verificable  VARCHAR(16)  NOT NULL,   -- CONSULTA | MANUAL | EXTERNO
   enunciado    VARCHAR(700) NOT NULL,
@@ -187,9 +190,6 @@ FROM (
   SELECT 'NOV-MOV-01', 'OTROS_DOMINIOS', 'Media', 'CONSULTA',
          'El proceso debe producir los indicadores de movilidad.',
          'legado PRO_Novedad_Linea_Indic_Movilidad (Novedad.sql:1508). Dominio no portado y depende integro del proceso P0029, cuya migracion esta pendiente' UNION ALL
-  SELECT 'NOV-AGR-01', 'OTROS_DOMINIOS', 'Alta', 'CONSULTA',
-         'El proceso debe producir la ubicacion agregada por persona.',
-         'legado PRO_Novedad_Linea_Ubi_Agregada (Novedad.sql:5032). Dominio no portado; es el mayor consumidor de las dos etapas de Ubicacion, con once puntos de lectura' UNION ALL
 
   -- ---------- ACTIVIDAD ECONOMICA ----------
   -- Segundo dominio portado. El legado es PRO_Novedad_Linea_Historial
@@ -230,6 +230,55 @@ FROM (
   SELECT 'NOV-AE-10', 'ACTIVIDAD_ECONOMICA', 'Alta', 'CONSULTA',
          'Toda fila con Severidad 1 debe llegar a la tabla final; las de Severidad -1 no.',
          'filtro Severidad <> -1 en 130.TPT:215; gemelo de NOV-UB-14' UNION ALL
+
+  -- ---------- UBICACION AGREGADA ----------
+  -- Tercer dominio portado. El legado es PRO_Novedad_Linea_Ubi_Agregada
+  -- (Novedad.sql:5032-7200), 22 etapas. Por eso NOV-AGR-01 desaparecio de
+  -- OTROS_DOMINIOS: decia "dominio no portado" y dejo de ser cierto. Misma
+  -- correccion que NOV-HIS-01 en la entrega anterior.
+  --
+  -- SIETE DE LOS OCHO ESTAN BLOQUEADOS POR UN CATALOGO, Y CONVIENE LEER POR
+  -- QUE ANTES DE INVESTIGARLO.
+  --   tipo_identificacion sale NULL en TODA fila
+  --   (sp_novedades_ubicacion_edf.sql:362, "falta V_Hom_Tip_Ident_Linea"), y
+  --   la etapa 5 del legado une por igualdad en esa columna
+  --   (Novedad.sql:5431). NULL = NULL es falso, de modo que el join vacia la
+  --   cadena entera: medido en el banco, las etapas 1 a 4 traen 8.500 filas y
+  --   la 5 trae cero.
+  --   EL PORT ES FIEL: el legado no pone centinela ahi y la etapa 2 arrastra
+  --   la columna cruda (:8624). No hay COALESCE que portar, y meter uno
+  --   fundiria filas que el legado no funde -- cambiaria un bloqueo visible
+  --   por un defecto silencioso.
+  --   Lo que falta es un volcado de dos columnas. El mismo catalogo que ya
+  --   bloquea NOV-AE-07 y NOV-UB-18, que ahora bloquea un dominio entero.
+  --
+  -- NOV-AG-01 SI SE EVALUA, y a proposito: mira el contrato en
+  -- information_schema, que no depende de que haya filas. Es el unico que
+  -- cazaria una deriva del contrato mientras el resto espera al catalogo.
+  SELECT 'NOV-AG-01', 'UBICACION_AGREGADA', 'Alta', 'CONSULTA',
+         'La etapa final debe exponer las 30 columnas del contrato y la tabla final las 32, porque las dos son contrato publico y un CTAS dejaria que el tipo lo infiriera la consulta.',
+         'contrato en 35_ddl_nov_ubi_agregada.sql; origen en P0035_Extractor_Novedades_130.TPT:1033-1147' UNION ALL
+  SELECT 'NOV-AG-02', 'UBICACION_AGREGADA', 'Alta', 'CONSULTA',
+         'La tabla final no debe tener dos filas con la misma llave de siete columnas.',
+         'la llave del UPSERT es info_basica, tipo_identificacion, numero_identificacion y el trio ubicacion_dato / ubicacion_codigodane / ubicacion_ciudad / ubicacion_departamento (130.TPT:1060-1066). Las etapas 5, 6 y 7 del legado unen SIN info_basica (Novedad.sql:5431-5436): si el par (tipo, numero) no la determina, la salida se multiplica y nada falla' UNION ALL
+  SELECT 'NOV-AG-03', 'UBICACION_AGREGADA', 'Alta', 'CONSULTA',
+         'Las tres columnas agregadas por concatenacion deben traer la lista completa y ordenada, no un solo valor.',
+         'el legado las arma con tres WITH RECURSIVE (Novedad.sql:5700-6100); nuestro port usa LISTAGG con WITHIN GROUP, que es el idioma de Redshift para lo mismo' UNION ALL
+  SELECT 'NOV-AG-04', 'UBICACION_AGREGADA', 'Alta', 'CONSULTA',
+         'El orden de la ubicacion debe numerarse por persona y clase, sin huecos ni empates.',
+         'ROW_NUMBER sobre PARTITION BY info_basica, ubicacion_clase en sp_novedades_ubi_agregada_edf.sql; el desempate final por MD5(ubicacion_dato) existe para que el numero sea estable entre corridas' UNION ALL
+  SELECT 'NOV-AG-05', 'UBICACION_AGREGADA', 'Alta', 'CONSULTA',
+         'Las cinco columnas de reporte deben venir pobladas, al reves que en el dominio UBICACION.',
+         'reportdesde, ultreporte, numentidades, numreportes y fuente. En UBICACION salen NULL y 0 literales (Novedad.sql:8358-8363) porque esa ruta no consume la etapa 2; esta SI la consume, de modo que aqui un NULL es un defecto y alli no. Es el contraste que NOV-UB-09 vigila del otro lado' UNION ALL
+  SELECT 'NOV-AG-06', 'UBICACION_AGREGADA', 'Alta', 'CONSULTA',
+         'Ninguna fila debe salir marcada como baja y la tabla final no debe perder filas.',
+         'la Severidad compara 19 columnas con tres centinelas (120.TPT:406-442) y solo devuelve 1 o -1: ninguna rama da 2, de modo que el DELETE del 130.TPT:1135-1147 es inalcanzable. Tercera vez que el borrado es codigo muerto en este proceso, tras NOV-UB-13 y NOV-AE-08' UNION ALL
+  SELECT 'NOV-AG-07', 'UBICACION_AGREGADA', 'Alta', 'CONSULTA',
+         'Una segunda corrida sobre los mismos datos no debe hacer crecer la tabla final.',
+         'este dominio es el unico de los tres cuyo UPSERT ACTUALIZA (130.TPT:1036-1059, UPDATE mas INSERT FOR MISSING). Nuestro DELETE de las llaves que vuelven a entrar mas INSERT es equivalente porque el UPDATE pisa todas las columnas que no son llave' UNION ALL
+  SELECT 'NOV-AG-08', 'UBICACION_AGREGADA', 'Media', 'CONSULTA',
+         'El codigo de pais debe seguir en blanco mientras no exista su catalogo.',
+         'el CROSS JOIN contra V_PAIS (Novedad.sql:7175-7178) no se porta: contra una vista inexistente dejaria la etapa vacia. Gemelo de NOV-UB-09: el criterio verifica que SIGA en blanco, no que se llene' UNION ALL
 
   -- ---------- Gobernanza ----------
   SELECT 'NOV-G-01', 'GOBERNANZA', 'Alta', 'CONSULTA',
