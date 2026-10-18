@@ -31,3 +31,5 @@
 31_ddl_nov_control.sql
 31b_ddl_nov_control_mock.sql
 33_ddl_cert_criterios_nov.sql
+34_ddl_nov_actividad_economica.sql
+34b_ddl_nov_actividad_economica_mock.sql

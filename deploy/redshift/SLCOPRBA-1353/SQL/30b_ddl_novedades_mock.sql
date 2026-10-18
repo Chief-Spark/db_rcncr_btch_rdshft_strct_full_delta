@@ -1,6 +1,6 @@
 -- ============================================================
 -- 30b_ddl_novedades_mock.sql
--- ESPEJO MOCK de 30_ddl_novedades.sql. Generado por sustitucion: los tres
+-- ESPEJO MOCK de 30_ddl_novedades.sql. Generado por sustitucion: los
 -- nombres de tabla reciben el sufijo _mock y NADA MAS cambia.
 -- El diff contra el real debe salir vacio modulo ese sufijo.
 -- Las justificaciones de tipo, contrato y divergencia estan en el archivo
