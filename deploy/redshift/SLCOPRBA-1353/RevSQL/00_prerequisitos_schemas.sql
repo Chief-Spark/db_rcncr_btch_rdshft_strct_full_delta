@@ -2,21 +2,46 @@
 -- 00_rollback (prerequisitos): es la ULTIMA entrada de rollback.par, de modo
 -- que cuando corre ya no queda ningun objeto nuestro en pie.
 --
--- bdm_datos y bdm_tempo NO se borran. Alojan los SP de pgm y un
--- DROP SCHEMA ... CASCADE los arrasa: incidente strct #256, que dejo a dt
--- cayendo con 42883. CREATE SCHEMA IF NOT EXISTS en el DPLY es suficiente.
+-- NO BORRA NINGUN ESQUEMA, Y LOS TRES MOTIVOS SON DISTINTOS DE LO QUE AQUI
+-- DECIA. Este archivo llevo durante un commit un 'DROP SCHEMA IF EXISTS
+-- bdm_stage;' defendido con que el esquema "es nuestro y solo tiene semillas
+-- mock". ERA FALSO y tumbo el job DEV/DATABASE #422:
 --
--- bdm_stage SI, Y SIN CASCADE. Es nuestro y solo tiene semillas mock; el
--- DPLY lo crea y hasta ahora nadie lo borraba, de modo que en un ambiente
--- limpio sobrevivia al rollback y rompia la comparacion DDL_1 vs DDL_3 del
--- pipeline (job QA/DATABASE #122, [REDSHIFT:335]).
+--   2BP01: cannot drop schema bdm_stage because other objects depend on it
 --
--- SIN CASCADE ES LA PARTE QUE IMPORTA, y es lo que lo separa del #256: si
--- alguien dejo un objeto dentro, la sentencia FALLA en vez de arrasar con el.
--- Esa es exactamente la propiedad que se quiere de un rollback.
+-- Quien vive en bdm_stage y no es semilla mock:
+--   - NUESTRO PROPIO pgm: bdm_stage.sp_geo_ciclo_lote,
+--     bdm_stage.sp_geo_exportar_insumo y bdm_stage.sp_geo_reenganchar_r3,
+--     los tres wrappers con la firma de 6 VARCHAR del Framework Batch.
+--   - el sandbox PP9999: pp9999_pgm_deploy_marker y 17 funciones sp_pp9999_*.
+--   - trabajo ajeno: sp_ordenamiento_cargar_seed_mock, _validar_mock,
+--     _ejecucion_mock y los sp_geo_* sin wrapper.
+--
+-- Y SIN CASCADE NO SALVA NADA, QUE ERA EL OTRO ERROR DEL ARGUMENTO: no arrasa,
+-- pero ABORTA el rollback. Fallo en RLLBCK_PRECHECK -- donde catchError lo
+-- captura -- y otra vez en RLLBCK_FINAL, donde no hay red y el build cae. Es
+-- el incidente DEV #256 por el otro extremo: con CASCADE destruye, sin CASCADE
+-- deja el pipeline rojo. Las dos salidas son malas y la buena es no borrarlo.
+--
+-- bdm_datos y bdm_tempo tampoco, por el #256 de siempre: alojan los SP de pgm
+-- y un DROP SCHEMA ... CASCADE los arrasa, dejando a dt cayendo con 42883.
+-- CREATE SCHEMA IF NOT EXISTS en el DPLY es suficiente.
+--
+-- Y EL DROP NUNCA FUE EL REVERSO DE ESTE ARCHIVO: el 00 de SQL/ crea
+-- bdm_datos, bdm_tempo y convert_epoch_to_date, NO bdm_stage. A bdm_stage lo
+-- crean 02a, 02c, 03b, 05 y 12 con CREATE SCHEMA IF NOT EXISTS.
+--
+-- LA COMPARACION DDL_1 vs DDL_3 YA CUADRA SIN ESTE DROP, que es lo que lo
+-- hacia innecesario ademas de peligroso. La guarda de RevSQL/02a y RevSQL/02c
+-- corre en el RLLBCK_PRECHECK, o sea ANTES de que se tome DDL_1, de modo que
+-- el esquema aparece en las dos fotos. Lo que arreglo el [REDSHIFT:335] del
+-- job QA/DATABASE #122 fueron los seis DROP de OBJETO (tres catalogos,
+-- rpu_orden_prioridad, mock_cuenta y mock_comportamiento_cta), no este.
+--
+-- La funcion convert_epoch_to_date se queda por la leccion #10: Redshift no
+-- soporta DROP FUNCTION IF EXISTS y obliga a firma exacta, de modo que
+-- dropearla reventaria el RLLBCK_PRECHECK en ambiente limpio.
 -- UTF-8 sin BOM, sin acentos.
 -- ============================================================
-
-DROP SCHEMA IF EXISTS bdm_stage;
 
 SELECT 1;
