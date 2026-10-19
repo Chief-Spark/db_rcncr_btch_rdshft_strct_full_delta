@@ -310,3 +310,37 @@ SELECT
   cod_suscriptor
 FROM bdm_stage.contacto_canal
 WITH NO SCHEMA BINDING;
+
+
+-- ============================================================
+-- SLCOPRBA-1355 -- Espejos mock del contrato de la Fase 2.
+-- Mismas columnas que v_xpm_cuenta y v_xpm_comportamiento_cta; la diferencia
+-- es que estas SI tienen filas, las que siembra seed_mock_matriz_ord.sql.
+-- ============================================================
+
+CREATE OR REPLACE VIEW bdm_tempo.v_mock_cuenta AS
+SELECT
+  CAST(cod_dw_cta                  AS BIGINT)        AS cod_dw_cta,
+  CAST(id_buro_persona             AS BIGINT)        AS id_buro_persona,
+  CAST(cod_pin_persona             AS BIGINT)        AS cod_pin_persona,
+  CAST(cod_suscriptor              AS CHAR(6))       AS cod_suscriptor,
+  CAST(cod_tipo_cta_fte            AS VARCHAR(10))   AS cod_tipo_cta_fte,
+  CAST(cod_tipo_obligacion_fte     AS VARCHAR(10))   AS cod_tipo_obligacion_fte,
+  CAST(cod_tipo_rel_con_cta_fte    AS VARCHAR(10))   AS cod_tipo_rel_con_cta_fte,
+  CAST(cod_clase_garantia_buro_fte AS VARCHAR(10))   AS cod_clase_garantia_buro_fte,
+  CAST(num_cuotas_pactadas         AS INTEGER)       AS num_cuotas_pactadas,
+  CAST(fecha_nov                   AS DATE)          AS fecha_nov,
+  CAST(valor_saldo                 AS DECIMAL(18,2)) AS valor_saldo,
+  CAST(valor_cuota_mensual         AS DECIMAL(18,2)) AS valor_cuota_mensual,
+  CAST(numero_dias_mora            AS INTEGER)       AS numero_dias_mora,
+  CAST(num_cuotas_pagadas          AS INTEGER)       AS num_cuotas_pagadas
+FROM bdm_stage.mock_cuenta
+WITH NO SCHEMA BINDING;
+
+CREATE OR REPLACE VIEW bdm_tempo.v_mock_comportamiento_cta AS
+SELECT
+  CAST(cod_dw_cta  AS BIGINT)  AS cod_dw_cta,
+  CAST(tipo        AS CHAR(1)) AS tipo,
+  CAST(fecha_corte AS DATE)    AS fecha_corte
+FROM bdm_stage.mock_comportamiento_cta
+WITH NO SCHEMA BINDING;

@@ -1,5 +1,8 @@
 -- Rollback 02b: vistas insumo MOCK (bdm_stage)
 -- Revierte 02b_vistas_insumo_mock.sql
+-- SLCOPRBA-1355: espejos del contrato de la Fase 2.
+DROP VIEW IF EXISTS bdm_tempo.v_mock_comportamiento_cta;
+DROP VIEW IF EXISTS bdm_tempo.v_mock_cuenta;
 DROP VIEW IF EXISTS bdm_tempo.v_mock_contacto_canal;
 DROP VIEW IF EXISTS bdm_tempo.v_mock_contacto_direccion;
 DROP VIEW IF EXISTS bdm_tempo.v_mock_ciiu_persona;

@@ -213,3 +213,70 @@ VALUES
   (1, 'RES'),
   (2, 'LAB'),
   (3, 'CRR');
+
+
+-- ============================================================
+-- SLCOPRBA-1355 -- SEMILLAS DE LA FASE 2 (Atributos de Cuenta)
+--
+-- POR QUE EXISTEN. El clasificador Portafolio de F2-05
+-- (PRO_ORD_CTA_TOTALES_PERSONAS_2.sql:304-375) es un CASE anidado de 179
+-- lineas que consume NUEVE columnas, y de ellas nuestro modelo solo tenia
+-- cod_suscriptor. Estas dos tablas son las otras ocho.
+--
+-- LOS NOMBRES SON LOS DEL LEGADO, no los del datashare. Es la decision que se
+-- tomo al planificar F2: asi el CASE se copia literal y no hay una traduccion
+-- de columnas de por medio donde equivocarse.
+--
+-- EL COMPORTAMIENTO ACTIVO Y EL PASIVO VAN EN UNA SOLA TABLA. El legado los
+-- tiene en dos (STG_COMPORTAMIENTO_CTA_ACTIVO y _PASIVO) y los lee con dos
+-- LEFT JOIN para derivar Flag_Comp_Cta_Activo y _Pasivo como simple
+-- "existe fila" (:290-297). Una tabla con una columna que los distinga da
+-- exactamente las mismas dos banderas y evita duplicar la semilla.
+--
+-- DROP + CREATE como las demas de este archivo: CREATE TABLE IF NOT EXISTS no
+-- anade columnas a una tabla ya existente y Redshift no admite
+-- ALTER TABLE ADD COLUMN IF NOT EXISTS. Son semillas: no hay dato productivo.
+-- ============================================================
+
+DROP TABLE IF EXISTS bdm_stage.mock_cuenta;
+
+CREATE TABLE bdm_stage.mock_cuenta (
+  cod_dw_cta                   BIGINT,
+  id_buro_persona              BIGINT,
+  cod_pin_persona              BIGINT,
+  -- cod_suscriptor es de SEIS digitos y el legado lo corta con
+  -- SUBSTR(...,1,2) para el prefijo. CHAR fija el ancho: con VARCHAR, un
+  -- codigo de cinco digitos daria un prefijo distinto sin avisar.
+  cod_suscriptor               CHAR(6),
+  -- Las seis que decide el CASE de Portafolio, con los nombres del legado.
+  cod_tipo_cta_fte             VARCHAR(10),
+  cod_tipo_obligacion_fte      VARCHAR(10),
+  cod_tipo_rel_con_cta_fte     VARCHAR(10),
+  cod_clase_garantia_buro_fte  VARCHAR(10),
+  num_cuotas_pactadas          INTEGER,
+  -- Ancla de la ventana de 12 meses (F2-02). add_months(fecha_nov, -12) va
+  -- por CUENTA, no por corrida: PRO_ORD_CTA_TOTALES_PERSONAS.sql:93.
+  fecha_nov                    DATE,
+  -- Las cuatro del concatena que si podemos sembrar sin inventar credito.
+  valor_saldo                  DECIMAL(18,2),
+  valor_cuota_mensual          DECIMAL(18,2),
+  numero_dias_mora             INTEGER,
+  num_cuotas_pagadas           INTEGER
+)
+DISTSTYLE KEY DISTKEY (id_buro_persona)
+SORTKEY (id_buro_persona, cod_dw_cta);
+
+DROP TABLE IF EXISTS bdm_stage.mock_comportamiento_cta;
+
+CREATE TABLE bdm_stage.mock_comportamiento_cta (
+  cod_dw_cta      BIGINT,
+  -- 'A' activo, 'P' pasivo. El legado lo resuelve con dos tablas; aqui una
+  -- columna da las dos banderas.
+  tipo            CHAR(1),
+  -- La fecha que decide si el comportamiento cae DENTRO de la ventana de los
+  -- 12 meses. El ARQ 101 siembra una dentro y otra fuera: sin las dos, F2-02
+  -- no se puede afirmar ni negar.
+  fecha_corte     DATE
+)
+DISTSTYLE KEY DISTKEY (cod_dw_cta)
+SORTKEY (cod_dw_cta, tipo);

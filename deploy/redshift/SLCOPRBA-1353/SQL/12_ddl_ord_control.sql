@@ -206,3 +206,50 @@ CREATE TABLE IF NOT EXISTS bdm_datos.ubicacion_atributo_hash_mock (
 )
 DISTSTYLE KEY DISTKEY (cod_dw_persona_ubic)
 SORTKEY (id_buro_persona, cod_dw_persona_ubic);
+
+
+-- ============================================================
+-- SLCOPRBA-1355 -- CUENTA_ATRIBUTO_HASH (Fase 2 del Ordenamiento)
+--
+-- Gemela de ubicacion_atributo_hash, y por el mismo motivo: F2-07 pide un MD5
+-- de 32 caracteres por registro para detectar cambios entre ejecuciones.
+-- Legado: PRO_ORD_CONCAT_ATRIBUTOS (arma el concatena) y
+-- PRO_ORD_FINAL_CTA_ATRIBUTOS (persiste).
+--
+-- INSERT-ONLY, igual que la de ubicaciones y por la MISMA razon escrita: el
+-- UPDATE de PRO_ORD_FINAL_CTA_ATRIBUTOS.sql:200 esta comentado con
+-- "Por solicitud de Experian... no se va a necesitar". Las dos tablas de hash
+-- del legado llevan la misma frase, que es lo que convierte esa desactivacion
+-- en una decision de negocio y no en basura de edicion.
+--
+-- DISTKEY por cod_dw_cta: es el grano de la Fase 2 y el PRIMARY INDEX del
+-- legado.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS bdm_datos.cuenta_atributo_hash (
+  cod_pin_persona      BIGINT       NOT NULL,
+  id_buro_persona      BIGINT       NOT NULL,
+  cod_dw_cta           BIGINT       NOT NULL,
+  cod_dw_hash          CHAR(32)     NOT NULL,   -- F2-07: MD5, 32 exactos
+  fecha_nov            DATE         NOT NULL,
+  -- portafolio se guarda para que F2-05 y F2-06 tengan donde mirar: el
+  -- staging que lo calcula lo borra el cleanup.
+  portafolio           VARCHAR(10),
+  lote                 INTEGER,
+  usuario_bd           VARCHAR(100)
+)
+DISTSTYLE KEY DISTKEY (cod_dw_cta)
+SORTKEY (id_buro_persona, cod_dw_cta);
+
+CREATE TABLE IF NOT EXISTS bdm_datos.cuenta_atributo_hash_mock (
+  cod_pin_persona      BIGINT       NOT NULL,
+  id_buro_persona      BIGINT       NOT NULL,
+  cod_dw_cta           BIGINT       NOT NULL,
+  cod_dw_hash          CHAR(32)     NOT NULL,
+  fecha_nov            DATE         NOT NULL,
+  portafolio           VARCHAR(10),
+  lote                 INTEGER,
+  usuario_bd           VARCHAR(100)
+)
+DISTSTYLE KEY DISTKEY (cod_dw_cta)
+SORTKEY (id_buro_persona, cod_dw_cta);

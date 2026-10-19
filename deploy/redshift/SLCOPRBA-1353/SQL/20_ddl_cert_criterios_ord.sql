@@ -29,13 +29,16 @@
 --     G-01..G-06      Gobernanza de migracion                    (6)
 --     CA-F01..F06 / CA-M01..M04 / CA-T01..T05                    (15)
 --
--- ALCANCE DE ESTA ENTREGA: las Fases 1, 2 y 3 NO estan portadas a Redshift
---   (verificado: BTT, REC, cta_atributos, portafolio y MD5 dan cero
---   coincidencias en los tres repos). Son 29 criterios que el evaluador
---   marca NO_IMPLEMENTADO -- visibles, no ausentes. Lo que se certifica es
---   la Fase 4, que en el legado es un proceso SEPARABLE: vive integra en
---   Caracteristicas.txt, no en Prc_Ordenamiento2.sql, y corre desde otra
---   malla (BTEQ_CURSOR_131.BTQ) con los cuatro canales en paralelo.
+-- ALCANCE DE ESTA ENTREGA: LAS CUATRO FASES ESTAN PORTADAS SOBRE MOCK.
+--   (Este parrafo decia que las Fases 1, 2 y 3 NO lo estaban y que sus 29
+--   criterios salian NO_IMPLEMENTADO. Ya no queda ni uno: la 1 se cerro
+--   re-especificando el alcance por lote y watermark, la 3 con la tabla de
+--   hash de ubicaciones y la 2 con el clasificador de portafolio y la de
+--   cuentas.) La Fase 4 sigue siendo la unica SEPARABLE en el legado: vive
+--   integra en Caracteristicas.txt, no en Prc_Ordenamiento2.sql, y corre
+--   desde otra malla (BTEQ_CURSOR_131.BTQ) con los cuatro canales en
+--   paralelo. Lo que no se afirma queda BLOQUEADO con su insumo nombrado,
+--   nunca NO_IMPLEMENTADO.
 --
 -- ESTADOS que usa el gate (bdm_datos.cert_resultado_ord.estado):
 --   PASSED            la consulta verifico el criterio
@@ -144,34 +147,34 @@ FROM (
          'legado PRO_ORD_MATERIALIZA_BTT / PRO_ORD_MATERIALIZA_REC / PRO_ORD_UNIF_BTT_REC, en dt/docs/legado_ordenamiento_f1_f3/. NO se porta: se re-especifica. Sus 46 pasos detectan el delta con bdm_mtdat.MetadataCargaLog y dbc.tables, plomeria de Teradata sin contraparte; el equivalente es el alcance por lote y watermark de sp_ordenamiento_preparar_insumos (:36-67). De los seis tipos, nuestro alcance cubre DOS. Los otros cuatro no tienen senal de delta en el modelo: ubicacion_estandarizada no tiene fecha ni lote, la columna bloqueado es bandera sin fecha, y no hay tabla de cuentas. Es trabajo de modelo, no un predicado que falte, y por eso sale BLOQUEADO' UNION ALL
   SELECT 'F2-01','FASE2','Alta','CONSULTA',
          'Solo se deben extraer cuentas de personas identificadas en la Fase 1 (materializacion).',
-         'legado PRO_ORD_CTA_ATRIBUTOS / PRO_ORD_CTA_TOTALES_PERSONAS / PRO_ORD_CONCAT_ATRIBUTOS. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CTA_ATRIBUTOS:163 (VU_CUENTA restringida al universo). Portado en sp_ordenamiento_cuentas_edf / _mock: stg_ord_cta_base hace INNER JOIN contra stg_ord_personas_alcance, que es el universo que deja la Fase 1. Una cuenta de una persona fuera del alcance no entra.' UNION ALL
   SELECT 'F2-02','FASE2','Alta','CONSULTA',
          'Se debe calcular una ventana temporal de 12 meses hacia atras desde la fecha de novedad.',
-         'legado PRO_ORD_CTA_ATRIBUTOS / PRO_ORD_CTA_TOTALES_PERSONAS / PRO_ORD_CONCAT_ATRIBUTOS. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CTA_TOTALES_PERSONAS:93, add_months(fecha_nov, -12). La ventana es POR CUENTA y no global: el ancla es la fecha_nov de cada cuenta. Portado como DATEADD(month, -12, c.fecha_nov) en stg_ord_cta_base, columna fecha_nov_ini. El ARQ 99 siembra comportamiento dentro y fuera de esa ventana para que el criterio afirme algo.' UNION ALL
   SELECT 'F2-03','FASE2','Alta','CONSULTA',
          'Se debe extraer el comportamiento activo dentro de esa ventana.',
-         'legado PRO_ORD_CTA_ATRIBUTOS / PRO_ORD_CTA_TOTALES_PERSONAS / PRO_ORD_CONCAT_ATRIBUTOS. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CTA_TOTALES_PERSONAS_1.sql:106, comportamiento ACTIVO dentro de la ventana. Portado como flag_comp_cta_activo en stg_ord_cta_base: un LEFT JOIN contra el comportamiento de la cuenta acotado por fecha_corte entre fecha_nov_ini y fecha_nov. Es una de las nueve columnas que el CASE de Portafolio consume.' UNION ALL
   SELECT 'F2-04','FASE2','Alta','CONSULTA',
          'Se debe extraer el comportamiento pasivo dentro de esa ventana.',
-         'legado PRO_ORD_CTA_ATRIBUTOS / PRO_ORD_CTA_TOTALES_PERSONAS / PRO_ORD_CONCAT_ATRIBUTOS. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CTA_TOTALES_PERSONAS_2.sql:106, comportamiento PASIVO dentro de la misma ventana. Portado como flag_comp_cta_pasivo, simetrico al activo. Las dos banderas son las que destraban la rama CO del Portafolio, que el catalogo de 23_ddl_catalogo_portafolio_ord.sql habia dejado sin construir.' UNION ALL
   SELECT 'F2-05','FASE2','Alta','CONSULTA',
          'Cada cuenta se debe clasificar en uno de 9 portafolios: CO, RO, VE, HP, IN, OT, CC, AH, CT. No puede haber valores fuera de este catalogo.',
-         'legado PRO_ORD_CTA_ATRIBUTOS / PRO_ORD_CTA_TOTALES_PERSONAS / PRO_ORD_CONCAT_ATRIBUTOS. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CTA_TOTALES_PERSONAS_2.sql:304-375, un CASE anidado de 179 lineas sobre nueve columnas. CUIDADO: no confundirlo con Portafolio_Nuevo (:376-389, veinte lineas y ONCE valores), que es otra columna y ya estaba portada. Los nueve valores del CASE son exactamente los nueve que el criterio nombra, de modo que NO hay divergencia. Portado literal en stg_ord_cta_hash.' UNION ALL
   SELECT 'F2-06','FASE2','Alta','CONSULTA',
          'No puede haber portafolios vacios (NULL).',
-         'legado PRO_ORD_CTA_ATRIBUTOS / PRO_ORD_CTA_TOTALES_PERSONAS / PRO_ORD_CONCAT_ATRIBUTOS. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CTA_TOTALES_PERSONAS_2.sql:375, el ELSE del CASE. El clasificador no tiene salida nula: toda cuenta cae en una rama o en el ELSE. Lo verifica el ARQ 99, que siembra un perfil por rama ancha, y la persona sin cuenta del segundo segmento, que no produce fila en vez de producir una con portafolio nulo.' UNION ALL
   SELECT 'F2-07','FASE2','Alta','CONSULTA',
          'Se debe generar un hash MD5 de exactamente 32 caracteres por cada registro para detectar cambios entre ejecuciones.',
-         'legado PRO_ORD_CTA_ATRIBUTOS / PRO_ORD_CTA_TOTALES_PERSONAS / PRO_ORD_CONCAT_ATRIBUTOS. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_FINAL_CTA_ATRIBUTOS.sql:110-133. Redshift trae MD5() nativo y no hace falta la UDF rec_vista.hash_md5. El MD5 va FUERA de la subconsulta que arma el concatena: el legado referencia el alias de la columna de al lado y Redshift no lo resuelve, la misma trampa que FLAG_OP en Novedad.sql:8392-8396.' UNION ALL
   SELECT 'F2-08','FASE2','Alta','CONSULTA',
          'El campo concatena no puede ser vacio ni NULL.',
-         'legado PRO_ORD_CTA_ATRIBUTOS / PRO_ORD_CTA_TOTALES_PERSONAS / PRO_ORD_CONCAT_ATRIBUTOS. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CONCAT_ATRIBUTOS.sql:95-120. El concatena lleva su centinela de un cero por cada columna ausente, en el sitio y el orden del legado, para que el dia que el dato exista el hash cambie en una linea y se vea en el diff. Por eso nunca sale vacio ni nulo: cada termino va envuelto en COALESCE.' UNION ALL
   SELECT 'F2-09','FASE2','Alta','CONSULTA',
          'Se debe registrar inicio y fin de la fase en el log de ejecucion.',
-         'legado PRO_ORD_CTA_ATRIBUTOS / PRO_ORD_CTA_TOTALES_PERSONAS / PRO_ORD_CONCAT_ATRIBUTOS. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado Prc_Ordenamiento2.sql, que registra cada paso en Control_Ordenamiento. El equivalente es ord_control_etapa con la etapa cuentas, que lleva fecha_hora_inicio y fecha_hora_fin, y la escriben los dos ciclos antes y despues de llamar al SP.' UNION ALL
   SELECT 'F2-10','FASE2','Alta','CONSULTA',
          'Se generan 3 fechas de insumo por cada Persona - Cuenta - Suscriptor para el calculo de numero de meses de reporte.',
-         'legado PRO_ORD_CTA_ATRIBUTOS / PRO_ORD_CTA_TOTALES_PERSONAS / PRO_ORD_CONCAT_ATRIBUTOS. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CTA_TOTALES_PERSONAS.sql:93. Las tres fechas por Persona-Cuenta-Suscriptor son el ancla fecha_nov, el inicio de ventana fecha_nov_ini y la fecha de la novedad del comportamiento; con ellas el legado calcula el numero de meses de reporte. Materializadas en stg_ord_cta_base.' UNION ALL
   SELECT 'F3-01','FASE3','Alta','CONSULTA',
          'Se deben excluir automaticamente los registros bloqueados.',
          'legado Prc_Ordenamiento2.sql:1122-1126 (anti-join contra bloqueo). FALTABA en el Ordenamiento de Redshift y las 100 bloqueadas del ARQ 59 llegaban al scoring; corregido en los dos preparar_insumos. Va como NOT EXISTS y no como filtro de fila porque el legado excluye el cod_dw_persona_ubic entero, y en el datashare ese id no es unico.' UNION ALL
@@ -306,13 +309,13 @@ FROM (
          'FULL vs FULL2. Exige desempate determinista: el legado no lo tiene y NO es reproducible ni en Teradata' UNION ALL
   SELECT 'RG-04','REGLA_GRAL','Alta','CONSULTA',
          'Las cuentas bloqueadas se excluyen del calculo de atributos.',
-         'pertenece a la Fase 2. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'pertenece a la Fase 2, que YA esta portada. Lo que falta es el dato: el contrato de cuenta no trae razon ni fecha de bloqueo, que en el legado salen de V_Razon_Bloqueo (PRO_ORD_CTA_ATRIBUTOS:298), del Bloque A del datashare. El bloqueo de DIRECCIONES si esta y lo certifica F3-01. Queda BLOQUEADO, no NO_IMPLEMENTADO.' UNION ALL
   SELECT 'RG-05','REGLA_GRAL','Alta','CONSULTA',
          'Solo direcciones vigentes (no hijas) reciben score.',
          'se evalua junto a F4-07' UNION ALL
   SELECT 'RG-06','REGLA_GRAL','Alta','CONSULTA',
          'El hash MD5 debe producir una salida consistente y deterministica para los mismos datos de entrada.',
-         'pertenece a las Fases 2 y 3. No hay MD5 en el Ordenamiento de Redshift. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'pertenece a las Fases 2 y 3, las dos portadas. MD5() nativo de Redshift sustituye al UDF rec_vista.hash_md5 del legado y escribe las dos tablas de hash: cuenta_atributo_hash (F2-07) y ubicacion_atributo_hash (F3-04). Que la longitud sea 32 en todas las filas lo miden esos dos criterios con dato.' UNION ALL
   SELECT 'RG-07','REGLA_GRAL','Alta','CONSULTA',
          'Todos los esquemas son fijos (rec_stage, rec_datos). No se utiliza SQL dinamico.',
          'en Redshift son bdm_datos / bdm_tempo / bdm_stage, fijos. El legado SI usa SQL dinamico con cursores (Ordenamiento.sql:244); nuestro port lo elimina: divergencia FAVORABLE, para bitacora' UNION ALL
@@ -375,7 +378,7 @@ FROM (
          'solo F4 esta portada; la dependencia no es verificable hasta que existan F1-F3' UNION ALL
   SELECT 'CA-T01','CA_TECN','Alta','CONSULTA',
          'El hash MD5 produce una salida consistente y deterministica de 32 caracteres.',
-         'pertenece a las Fases 2 y 3. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'pertenece a las Fases 2 y 3, las dos portadas. Mismo motivo que RG-06: lo miden F2-07 sobre las cuentas y F3-04 sobre las ubicaciones, cada uno contando los hash cuya longitud no sea 32.' UNION ALL
   SELECT 'CA-T02','CA_TECN','Alta','CONSULTA',
          'Cada fase registra inicio y fin con timestamp en el log de ejecucion.',
          'se evalua junto a RG-08' UNION ALL

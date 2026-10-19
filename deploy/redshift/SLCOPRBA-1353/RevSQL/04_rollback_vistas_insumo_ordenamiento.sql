@@ -1,4 +1,7 @@
 -- Rollback 04: vistas insumo ordenamiento
+-- SLCOPRBA-1355: el contrato de la Fase 2, lo ultimo que entra.
+DROP VIEW IF EXISTS bdm_tempo.v_xpm_comportamiento_cta;
+DROP VIEW IF EXISTS bdm_tempo.v_xpm_cuenta;
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_persona_dir_ganadora;
 DROP VIEW IF EXISTS bdm_datos.insumo_email;
 DROP VIEW IF EXISTS bdm_datos.insumo_celular;

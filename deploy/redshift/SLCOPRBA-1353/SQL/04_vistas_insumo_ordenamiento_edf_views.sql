@@ -193,3 +193,64 @@ SELECT DISTINCT id_buro_persona
 FROM bdm_tempo.v_rpu_post_unificacion
 WHERE COALESCE(ind_unificacion, 0) <> 1
 WITH NO SCHEMA BINDING;
+
+
+-- ============================================================
+-- SLCOPRBA-1355 -- v_xpm_cuenta: EL CONTRATO DE LA FASE 2, SIN FUENTE TODAVIA
+--
+-- LEER ESTO ANTES DE "ARREGLARLA": LA VISTA DEVUELVE CERO FILAS A PROPOSITO.
+--
+-- La Fase 2 necesita las nueve columnas del clasificador Portafolio
+-- (PRO_ORD_CTA_TOTALES_PERSONAS_2.sql:304-375). El candidato del datashare es
+-- edf_views.xpm_bestaccounts (~80 columnas), y sobre el hay una decision ya
+-- tomada y escrita en docs/MAPEO_DESBLOQUEO_DATASHARE_ORDENAMIENTO.md:184-188:
+--
+--   "Lo que no se hace: escribir nada sobre xpm_bestaccounts todavia. Su
+--    relacion con xpm_location por accountnumber esta sin verificar, y el
+--    legado advierte que la llave natural de una cuenta no es
+--    (accountnumber, accounttype) sino al menos
+--    (Num_Cta, Cod_Tipo_Cta_Fte, Id_Buro_Suscriptor)."
+--
+-- Adivinar ese mapeo para que el SP "tenga de donde leer" seria justo lo que
+-- esa decision prohibe, y una llave mal elegida colapsaria cuentas igual que
+-- el (id, index) colapsa contactos en Unificacion.
+--
+-- ASI QUE SE DECLARA EL CONTRATO Y SE DEJA LA FUENTE PENDIENTE. Cero filas
+-- hace que la via REAL de la Fase 2 no produzca nada -- que es exactamente lo
+-- cierto hoy -- en vez de reventar al primer CALL, y mantiene la paridad con
+-- el espejo mock, que SI tiene datos. El dia que la llave se verifique, se
+-- cambia el FROM de esta vista y no se toca ni una linea de los dos SP.
+--
+-- WITH NO SCHEMA BINDING como todas las de este archivo.
+-- ============================================================
+
+CREATE OR REPLACE VIEW bdm_tempo.v_xpm_cuenta AS
+SELECT
+  CAST(NULL AS BIGINT)        AS cod_dw_cta,
+  CAST(NULL AS BIGINT)        AS id_buro_persona,
+  CAST(NULL AS BIGINT)        AS cod_pin_persona,
+  CAST(NULL AS CHAR(6))       AS cod_suscriptor,
+  CAST(NULL AS VARCHAR(10))   AS cod_tipo_cta_fte,
+  CAST(NULL AS VARCHAR(10))   AS cod_tipo_obligacion_fte,
+  CAST(NULL AS VARCHAR(10))   AS cod_tipo_rel_con_cta_fte,
+  CAST(NULL AS VARCHAR(10))   AS cod_clase_garantia_buro_fte,
+  CAST(NULL AS INTEGER)       AS num_cuotas_pactadas,
+  CAST(NULL AS DATE)          AS fecha_nov,
+  CAST(NULL AS DECIMAL(18,2)) AS valor_saldo,
+  CAST(NULL AS DECIMAL(18,2)) AS valor_cuota_mensual,
+  CAST(NULL AS INTEGER)       AS numero_dias_mora,
+  CAST(NULL AS INTEGER)       AS num_cuotas_pagadas
+FROM bdm_stage.mock_numeros
+WHERE 1 = 0
+WITH NO SCHEMA BINDING;
+
+-- Mismo trato para el comportamiento: el contrato declarado, la fuente
+-- pendiente. El legado lo tiene en dos tablas y las lee como "existe fila".
+CREATE OR REPLACE VIEW bdm_tempo.v_xpm_comportamiento_cta AS
+SELECT
+  CAST(NULL AS BIGINT)  AS cod_dw_cta,
+  CAST(NULL AS CHAR(1)) AS tipo,
+  CAST(NULL AS DATE)    AS fecha_corte
+FROM bdm_stage.mock_numeros
+WHERE 1 = 0
+WITH NO SCHEMA BINDING;
