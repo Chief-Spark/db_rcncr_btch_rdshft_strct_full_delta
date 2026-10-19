@@ -174,37 +174,37 @@ FROM (
          'legado PRO_ORD_CTA_ATRIBUTOS / PRO_ORD_CTA_TOTALES_PERSONAS / PRO_ORD_CONCAT_ATRIBUTOS. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
   SELECT 'F3-01','FASE3','Alta','CONSULTA',
          'Se deben excluir automaticamente los registros bloqueados.',
-         'legado Prc_Ordenamiento2.sql:1123-1126 (anti-join contra bloqueo). NO existe filtro de bloqueo en el Ordenamiento de Redshift.' UNION ALL
+         'legado Prc_Ordenamiento2.sql:1122-1126 (anti-join contra bloqueo). FALTABA en el Ordenamiento de Redshift y las 100 bloqueadas del ARQ 59 llegaban al scoring; corregido en los dos preparar_insumos. Va como NOT EXISTS y no como filtro de fila porque el legado excluye el cod_dw_persona_ubic entero, y en el datashare ese id no es unico.' UNION ALL
   SELECT 'F3-02','FASE3','Alta','CONSULTA',
          'Se deben excluir los registros unificados (hijos). Solo se procesan direcciones vigentes (ind_unificacion IS NULL).',
-         'legado PRO_ORD_CALC_UBICACIONES_2 (Prc_Ordenamiento2.sql:1127, b.Ind_Unificacion IS NULL). PARCIAL en Redshift: el filtro existe en sp_ordenamiento_preparar_insumos_edf (7 veces) y en consolidacion, pero sin la persistencia por hash de la fase.' UNION ALL
+         'legado PRO_ORD_CALC_UBICACIONES_2 (Prc_Ordenamiento2.sql:1126, b.Ind_Unificacion IS NULL). El filtro vive en preparar_insumos y se verifica contra ubicacion_atributo_hash: ninguna hija puede llegar.' UNION ALL
   SELECT 'F3-03','FASE3','Alta','CONSULTA',
          'Tipo persona se debe clasificar correctamente (no puede haber tipo_persona NULL).',
-         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES, en dt/docs/legado_ordenamiento_f1_f3/. Portado en sp_ordenamiento_ubicaciones_edf y su espejo mock. Clasificacion derivada de cod_tipo_ident_fte, con COALESCE para que no pueda salir nula. El catalogo V_Tipo_persona del legado no esta en el datashare. Los ARQ 97 y 98 ejercitan NATURAL y JURIDICA.' UNION ALL
   SELECT 'F3-04','FASE3','Alta','CONSULTA',
          'Se debe generar un hash MD5 de 32 caracteres por cada direccion.',
-         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES, en dt/docs/legado_ordenamiento_f1_f3/. Portado en sp_ordenamiento_ubicaciones_edf y su espejo mock. MD5() nativo de Redshift sustituye al UDF rec_vista.hash_md5. Se verifica que las 32 posiciones esten en todas las filas.' UNION ALL
   SELECT 'F3-05','FASE3','Alta','CONSULTA',
          'Los registros nuevos se deben insertar en ubicacion_atributo_hash.',
-         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES, en dt/docs/legado_ordenamiento_f1_f3/. Portado en sp_ordenamiento_ubicaciones_edf y su espejo mock. El anti-join lleva CUATRO columnas, hash incluido: una direccion cuyo hash cambio no encuentra pareja y entra como fila nueva.' UNION ALL
   SELECT 'F3-06','FASE3','Alta','CONSULTA',
          'Los registros modificados (donde el hash difiere) se deben actualizar. Los registros sin cambios no se tocan.',
-         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES, en dt/docs/legado_ordenamiento_f1_f3/. Portado en sp_ordenamiento_ubicaciones_edf y su espejo mock. LA RAMA DE UPDATE ES CODIGO MUERTO EN EL LEGADO: esta comentada con Por solicitud de Experian no se va a necesitar (PRO_ORD_FINAL_UBIC_DIRECCIONES.sql:216), y la misma frase esta en PRO_ORD_FINAL_CTA_ATRIBUTOS.sql:200. El criterio se evalua contra la paridad real -- el cambio deja una segunda fila y la anterior no se toca --, igual que NOV-UB-13 y NOV-UB-15. Lo ejercitan el ARQ 97, al que le cambia el texto antes del DELTA2, y el ARQ 98, que no cambia.' UNION ALL
   SELECT 'F3-07','FASE3','Alta','CONSULTA',
          'La llave de deteccion de cambios es: cod_pin_persona + id_buro_persona + cod_dw_persona_ubic.',
-         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES, en dt/docs/legado_ordenamiento_f1_f3/. Portado en sp_ordenamiento_ubicaciones_edf y su espejo mock. Tres columnas para la entidad; el hash es la cuarta del anti-join. Se verifica por su consecuencia: no puede haber dos filas con la misma llave y el mismo hash.' UNION ALL
   SELECT 'F3-08','FASE3','Alta','CONSULTA',
          'Se debe registrar inicio y fin de la fase en el log de ejecucion.',
-         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES, en dt/docs/legado_ordenamiento_f1_f3/. Portado en sp_ordenamiento_ubicaciones_edf y su espejo mock. La etapa se llama ubicaciones y la escriben los dos ciclos en ord_control_etapa.' UNION ALL
   SELECT 'F3-09','FASE3','Alta','CONSULTA',
          'Solo se ordenan ubicaciones con cuentas activas para la fuente ICBDIR (Suscriptor). Para otras fuentes no se asocian cuentas a las personas y sus ubicaciones.',
-         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'BLOQUEADO: ICBDIR no aparece ni una vez en los 13.826 renglones del legado de F1-F3 (dt/docs/legado_ordenamiento_f1_f3/). El enunciado sale del RF y no del codigo, y ademas exige las cuentas de la Fase 2.' UNION ALL
   SELECT 'F3-10','FASE3','Alta','CONSULTA',
          'No se ordenan ubicaciones que no sean validas (resultado de algoritmo de estandarizacion).',
-         'legado PRO_ORD_CALC_UBICACIONES / PRO_ORD_UBIC_DIRECCIONES / PRO_ORD_FINAL_UBIC_DIRECCIONES. Fase no portada a Redshift. El evaluador la marca NO_IMPLEMENTADO: el criterio existe en el RF y el codigo no.' UNION ALL
+         'BLOQUEADO: la validez del estandarizador no aparece en el legado de F1-F3. El unico NO VALIDA esta en Caracteristicas.txt, que es la Fase 4 y otro grano: el divisor de DIR010FI y DIR013OT.' UNION ALL
   SELECT 'F3-11','FASE3','Alta','CONSULTA',
          'No se ordenan ubicaciones que hayan sido unificadas (resultado del algoritmo de unificacion).',
-         'mismo predicado que F3-02; se evalua junto a el.' UNION ALL
+         'mismo predicado que F3-02 y se evalua junto a el: ind_unificacion IS NULL en preparar_insumos, verificado contra ubicacion_atributo_hash.' UNION ALL
   SELECT 'F4-01','FASE4','Alta','CONSULTA',
          'El score se debe calcular para 4 canales: Direccion (DIR), Telefono Fijo (TEL), Celular (CEL) y Email (EMA).',
          'score_ordenamiento agrupado por canal; SP sp_ordenamiento_scoring_{dir,tel,cel,ema}_edf' UNION ALL

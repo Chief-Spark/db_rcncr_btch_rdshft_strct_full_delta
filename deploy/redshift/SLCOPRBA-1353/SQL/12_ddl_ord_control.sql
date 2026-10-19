@@ -152,3 +152,57 @@ CREATE TABLE IF NOT EXISTS bdm_stage.mock_ord_alcance_censo (
 )
 DISTSTYLE ALL
 SORTKEY (corrida_id);
+
+
+-- ============================================================
+-- SLCOPRBA-1355 -- UBICACION_ATRIBUTO_HASH (Fase 3 del Ordenamiento)
+--
+-- QUE ES. La deteccion de cambios por hash MD5 de la Fase 3: una fila por
+-- (persona, ubicacion, hash) con la huella de los atributos de la direccion.
+-- Legado: PRO_ORD_CONCAT_DIRECCIONES (arma el concatena) y
+-- PRO_ORD_FINAL_UBIC_DIRECCIONES (persiste). Criterios F3-04..07.
+--
+-- LA LLAVE DE DETECCION ES DE TRES COLUMNAS -- cod_pin_persona,
+-- id_buro_persona, cod_dw_persona_ubic -- y lo dice F3-07; el hash es el
+-- CUARTO campo del anti-join que decide si una combinacion es nueva, no parte
+-- de la llave de la entidad.
+--
+-- NO LLEVA RESTRICCION DE UNICIDAD, igual que el legado, donde el
+-- PRIMARY INDEX (Cod_DW_Persona_Ubic) de Teradata es NO UNIQUE. Una direccion
+-- que cambia deja DOS filas: la vieja con su hash y la nueva con el suyo. Eso
+-- no es un descuido del DDL, es el historial que el AS-IS produce.
+--
+-- DISTSTYLE KEY por cod_dw_persona_ubic: es la columna por la que se une con
+-- el staging de la corrida, y la que el legado usa de PRIMARY INDEX.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS bdm_datos.ubicacion_atributo_hash (
+  cod_pin_persona      BIGINT       NOT NULL,
+  id_buro_persona      BIGINT       NOT NULL,
+  cod_dw_persona_ubic  BIGINT       NOT NULL,
+  cod_dw_hash          CHAR(32)     NOT NULL,   -- F3-04: MD5, 32 exactos
+  fecha_nov            DATE         NOT NULL,
+  -- Las tres de abajo NO estan en UBICACION_ATRIBUTO_HASH del legado, que
+  -- tiene cinco columnas. tipo_persona esta porque F3-03 exige que no haya
+  -- ninguna nula y sin guardarla no hay donde mirarlo; lote y usuario_bd son
+  -- la traza que el resto de nuestras tablas lleva.
+  tipo_persona         VARCHAR(10),
+  lote                 INTEGER,
+  usuario_bd           VARCHAR(100)
+)
+DISTSTYLE KEY DISTKEY (cod_dw_persona_ubic)
+SORTKEY (id_buro_persona, cod_dw_persona_ubic);
+
+-- Espejo mock. Mismas columnas, misma semantica.
+CREATE TABLE IF NOT EXISTS bdm_datos.ubicacion_atributo_hash_mock (
+  cod_pin_persona      BIGINT       NOT NULL,
+  id_buro_persona      BIGINT       NOT NULL,
+  cod_dw_persona_ubic  BIGINT       NOT NULL,
+  cod_dw_hash          CHAR(32)     NOT NULL,
+  fecha_nov            DATE         NOT NULL,
+  tipo_persona         VARCHAR(10),
+  lote                 INTEGER,
+  usuario_bd           VARCHAR(100)
+)
+DISTSTYLE KEY DISTKEY (cod_dw_persona_ubic)
+SORTKEY (id_buro_persona, cod_dw_persona_ubic);
