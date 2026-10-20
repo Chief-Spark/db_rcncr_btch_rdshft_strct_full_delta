@@ -48,8 +48,21 @@ SELECT
   FNV_HASH(CAST(ci.id AS VARCHAR) || ':' || CAST(ci."index" AS VARCHAR)) AS cod_dw_direccion_fisica,
   FNV_HASH(xpm.pin)                 AS id_buro_persona,
   CAST(xpm.pin AS BIGINT)           AS cod_pin_persona,
+  -- 2026-10-20 (D-EDF-06): tipo de direccion segun el catalogo OFICIAL de
+  -- contactType (1 Residence, 2 Labor, 3 Mailing, 7 Legal Address-c,
+  -- 8 Business Address-c, 12 Notification Address). El 1, 2 y 3 coinciden con
+  -- los codigos de bdm_datos.tipo_ubicacion_dir (RES, LAB, CRR) y pasan tal
+  -- cual. El 8 es la direccion COMERCIAL (CCL en Information Recognizer) y
+  -- antes iba a CRR: el 91 % de las direcciones de DEV contaba como
+  -- correspondencia en el padre de la Regla 1, en el scoring DIR y en
+  -- ES_TIPO_CRR. El 7 es la LEGAL (JUD) y antes caia en el 7 'DIR' inventado.
+  -- Se usan los codigos que tipo_ubicacion_dir YA tiene (01_ddl_unificacion
+  -- _direccion.sql: 4 JUD, 5 CCL), sin DDL. El legado solo pregunta por RES,
+  -- LAB y CRR (P0019_UNIFICACION_111.TPT:94,101; Novedad.sql:8375-8382), asi
+  -- que CCL y JUD no dan puntos ni banderas, igual que alli.
   CASE
-    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '8' THEN 3
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '8' THEN 5
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '7' THEN 4
     -- SLCOPRBA-1354: tope de magnitud, como ya lo tenian standardizeddanecode
     -- y counterpartyidnumber en este mismo archivo. Sin el, un contacttype de
     -- mas de 10 digitos aborta el lote completo con "Value out of range for 4

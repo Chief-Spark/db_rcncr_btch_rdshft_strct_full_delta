@@ -122,8 +122,8 @@ LEFT JOIN (
   WHERE COALESCE(r.ind_unificacion, 0) <> 1
   GROUP BY 1
 ) ref ON ref.id_buro_persona = c.id_buro_persona
--- 2026-10-20: el canal lo decide v_xpm_contacto_canal (TEL = 4, 5 y el 6
--- fijo). Antes era IN ('4','5','8') y el 8 es direccion (D-EDF-08).
+-- 2026-10-20: el canal lo decide v_xpm_contacto_canal (TEL = 4, 5 y el 6 y 13
+-- fijos). Antes era IN ('4','5','8') y el 8 es direccion (D-EDF-08).
 WHERE c.canal = 'TEL'
   AND c.valor_contacto IS NOT NULL
 WITH NO SCHEMA BINDING;
@@ -156,7 +156,7 @@ LEFT JOIN (
   WHERE COALESCE(r.ind_unificacion, 0) <> 1
   GROUP BY 1
 ) ref ON ref.id_buro_persona = c.id_buro_persona
-WHERE c.canal = 'CEL'   -- 2026-10-20: 9 y el 6 celular (D-EDF-11)
+WHERE c.canal = 'CEL'   -- 2026-10-20: 9 y el 6 y 13 celulares (D-EDF-11)
   AND c.valor_contacto IS NOT NULL
 WITH NO SCHEMA BINDING;
 
