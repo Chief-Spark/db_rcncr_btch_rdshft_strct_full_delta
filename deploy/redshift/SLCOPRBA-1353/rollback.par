@@ -7,6 +7,7 @@
 31_rollback_ddl_nov_control.sql
 30b_rollback_ddl_novedades_mock.sql
 30_rollback_ddl_novedades.sql
+24_rollback_ddl_catalogo_divipola_cabecera.sql
 23_rollback_ddl_catalogo_portafolio_ord.sql
 22_rollback_ddl_catalogo_tipo_cuenta_ord.sql
 21_rollback_ddl_catalogos_dominio.sql

@@ -122,8 +122,9 @@ LEFT JOIN (
   WHERE COALESCE(r.ind_unificacion, 0) <> 1
   GROUP BY 1
 ) ref ON ref.id_buro_persona = c.id_buro_persona
--- 2026-10-20 (D-EDF-08): sin el 8, que es direccion (C6b).
-WHERE c.contact_type IN ('4', '5')
+-- 2026-10-20: el canal lo decide v_xpm_contacto_canal (TEL = 4, 5 y el 6
+-- fijo). Antes era IN ('4','5','8') y el 8 es direccion (D-EDF-08).
+WHERE c.canal = 'TEL'
   AND c.valor_contacto IS NOT NULL
 WITH NO SCHEMA BINDING;
 
@@ -155,7 +156,7 @@ LEFT JOIN (
   WHERE COALESCE(r.ind_unificacion, 0) <> 1
   GROUP BY 1
 ) ref ON ref.id_buro_persona = c.id_buro_persona
-WHERE c.contact_type = '9'
+WHERE c.canal = 'CEL'   -- 2026-10-20: 9 y el 6 celular (D-EDF-11)
   AND c.valor_contacto IS NOT NULL
 WITH NO SCHEMA BINDING;
 
@@ -178,7 +179,7 @@ INNER JOIN bdm_tempo.v_xpm_persona_dir_ganadora pg
   ON pg.id_buro_persona = c.id_buro_persona
 LEFT JOIN bdm_datos.catalogo_sector_financiero sf
   ON sf.id_buro_suscriptor = c.id_buro_suscriptor
-WHERE c.contact_type = '10'
+WHERE c.canal = 'EMA'
   AND c.valor_contacto LIKE '%@%'
 WITH NO SCHEMA BINDING;
 

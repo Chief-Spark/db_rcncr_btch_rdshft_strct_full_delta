@@ -79,10 +79,23 @@ SELECT
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') ~ '^[0-9]+$'
      AND CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') AS BIGINT) <= 2147483647
     THEN CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') AS INTEGER)
-    -- 2026-10-20 (D-EDF-02): sin DANE, NULL. Antes caia a un hash de cityname,
-    -- que inventaba una ciudad y mezclaba claves DANE con valores de hash.
-    -- Hoy falta en ~37 % de las direcciones (C6c); citycode puede suplirlo (C18).
-    ELSE NULL
+    -- 2026-10-20 (D-EDF-02, propuesta C aprobada): CIUDAD DE RESPALDO cuando
+    -- no hay DANE. Antes caia a un hash de cityname, que inventaba una ciudad
+    -- y mezclaba claves DANE con valores de hash. Falta el DANE en ~55k
+    -- direcciones en DEV y ~74k en QA (C18). En este orden:
+    --   1. citycode de 4-5 digitos: el municipio DANE sin el cero (C18; solo
+    --      en las direcciones de la fuente 6). Se toma su cabecera, * 1000.
+    --   2. el nombre de municipio + departamento contra el catalogo DIVIPOLA
+    --      de cabeceras (24_ddl_catalogo_divipola_cabecera.sql), primero con
+    --      la clave exacta y luego con el esqueleto de consonantes;
+    --   3. el nombre solo, si en el catalogo apunta a UNA cabecera.
+    -- 2 y 3 son PROBABLE: el reporte nombra el municipio y se asigna su
+    -- cabecera. Si nada casa, NULL.
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.citycode"::VARCHAR), '') ~ '^[0-9]+$'
+     AND LEN(TRIM(ci."location.val.contactinformations.val.citycode"::VARCHAR)) BETWEEN 4 AND 5
+    THEN CAST(TRIM(ci."location.val.contactinformations.val.citycode"::VARCHAR) AS INTEGER) * 1000
+    ELSE COALESCE(dve.cod_dane_ciudad, due.cod_dane_ciudad,
+                  dvs.cod_dane_ciudad, dus.cod_dane_ciudad)
   END AS cod_dw_ciudad,
   COALESCE(
     NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddepartment"::VARCHAR), ''),
@@ -138,6 +151,44 @@ INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location loc
   ON xpm.location = loc.id
 INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location_val_contactinformations ci
   ON loc."location.val.contactinformations" = ci.id
+-- Ciudad de respaldo (ver cod_dw_ciudad): clave exacta con departamento,
+-- exacta sola, esqueleto de consonantes con departamento y esqueleto solo.
+-- Cada subconsulta deja una fila por clave y solo si la clave apunta a UNA
+-- cabecera: el LEFT JOIN no puede multiplicar direcciones. El esqueleto
+-- casa los nombres con tilde que la exacta no puede (Medellin con tilde da
+-- MEDELLN en la exacta y MDLLN en las dos variantes del esqueleto).
+LEFT JOIN ( SELECT clave_ciudad, clave_depto, MIN(cod_dane_ciudad) AS cod_dane_ciudad
+              FROM bdm_datos.catalogo_divipola_cabecera
+             WHERE tipo_clave = 'E'
+             GROUP BY clave_ciudad, clave_depto
+            HAVING COUNT(DISTINCT cod_dane_ciudad) = 1 ) dve
+  ON dve.clave_ciudad = REGEXP_REPLACE(UPPER(TRIM(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedmunicipality"::VARCHAR), ''),
+                                   NULLIF(TRIM(ci."location.val.contactinformations.val.cityname"::VARCHAR), '')))), '[^A-Z0-9]', '')
+ AND dve.clave_depto  = REGEXP_REPLACE(UPPER(TRIM(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddepartment"::VARCHAR), ''),
+                                   NULLIF(TRIM(ci."location.val.contactinformations.val.statename"::VARCHAR), '')))), '[^A-Z0-9]', '')
+LEFT JOIN ( SELECT clave_ciudad, MIN(cod_dane_ciudad) AS cod_dane_ciudad
+              FROM bdm_datos.catalogo_divipola_cabecera
+             WHERE tipo_clave = 'E'
+             GROUP BY clave_ciudad
+            HAVING COUNT(DISTINCT cod_dane_ciudad) = 1 ) due
+  ON due.clave_ciudad = REGEXP_REPLACE(UPPER(TRIM(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedmunicipality"::VARCHAR), ''),
+                                   NULLIF(TRIM(ci."location.val.contactinformations.val.cityname"::VARCHAR), '')))), '[^A-Z0-9]', '')
+LEFT JOIN ( SELECT clave_ciudad, clave_depto, MIN(cod_dane_ciudad) AS cod_dane_ciudad
+              FROM bdm_datos.catalogo_divipola_cabecera
+             WHERE tipo_clave = 'S'
+             GROUP BY clave_ciudad, clave_depto
+            HAVING COUNT(DISTINCT cod_dane_ciudad) = 1 ) dvs
+  ON dvs.clave_ciudad = REGEXP_REPLACE(UPPER(TRIM(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedmunicipality"::VARCHAR), ''),
+                                   NULLIF(TRIM(ci."location.val.contactinformations.val.cityname"::VARCHAR), '')))), '[^B-DF-HJ-NP-TV-Z0-9]', '')
+ AND dvs.clave_depto  = REGEXP_REPLACE(UPPER(TRIM(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddepartment"::VARCHAR), ''),
+                                   NULLIF(TRIM(ci."location.val.contactinformations.val.statename"::VARCHAR), '')))), '[^B-DF-HJ-NP-TV-Z0-9]', '')
+LEFT JOIN ( SELECT clave_ciudad, MIN(cod_dane_ciudad) AS cod_dane_ciudad
+              FROM bdm_datos.catalogo_divipola_cabecera
+             WHERE tipo_clave = 'S'
+             GROUP BY clave_ciudad
+            HAVING COUNT(DISTINCT cod_dane_ciudad) = 1 ) dus
+  ON dus.clave_ciudad = REGEXP_REPLACE(UPPER(TRIM(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedmunicipality"::VARCHAR), ''),
+                                   NULLIF(TRIM(ci."location.val.contactinformations.val.cityname"::VARCHAR), '')))), '[^B-DF-HJ-NP-TV-Z0-9]', '')
 WHERE NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('1', '2', '3', '7', '8')
 WITH NO SCHEMA BINDING;
 

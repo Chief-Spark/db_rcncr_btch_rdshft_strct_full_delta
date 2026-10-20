@@ -49,7 +49,17 @@ CREATE SCHEMA IF NOT EXISTS bdm_tempo;
 -- DISTKEY por cod_dw_persona_ubic (la columna id): es la llave del UPSERT a
 -- mat_info_ubicacion y la de union de la etapa 2. SORTKEY igual, por el
 -- mismo predicado.
+--
+-- 2026-10-20 (D-NOV-04): info_basica pasa a BIGINT. Es id_buro_persona =
+-- FNV_HASH(pin), de 64 bits; en INTEGER la etapa abortaba con "integer out
+-- of range" con CUALQUIER dato real (reproducido en el banco con datos
+-- sinteticos). El mock no lo veia porque sus ids caben en 4 bytes.
+-- DROP + CREATE porque Redshift no cambia el tipo de una columna numerica y
+-- CREATE IF NOT EXISTS no altera una tabla existente. Es staging: el SP la
+-- trunca en cada corrida (sp_novedades_ubicacion_edf.sql:346), no se pierde
+-- nada.
 -- ------------------------------------------------------------
+DROP TABLE IF EXISTS bdm_tempo.stg_nov_ubica_etapa_9_mock;
 CREATE TABLE IF NOT EXISTS bdm_tempo.stg_nov_ubica_etapa_9_mock (
   cod_tipo_ident_fte              VARCHAR(20),
   tipo_identificacion             VARCHAR(30),
@@ -74,7 +84,7 @@ CREATE TABLE IF NOT EXISTS bdm_tempo.stg_nov_ubica_etapa_9_mock (
   localidad                       VARCHAR(100),
   codigo_postal                   VARCHAR(20),
   clase                           VARCHAR(5),
-  info_basica                     INTEGER,      -- id_buro_persona
+  info_basica                     BIGINT,       -- id_buro_persona (2026-10-20: era INTEGER)
   codigo_dane                     VARCHAR(20),
   es_tipo_crr                     VARCHAR(1),
   es_tipo_res                     VARCHAR(1),
@@ -151,6 +161,12 @@ SORTKEY (id);
 --
 -- flag_op NO se persiste como VARCHAR sino como el codigo numerico del
 -- legado (120.TPT:169-173): I -> 1, A -> 2, E -> 3.
+--
+-- 2026-10-20 (D-NOV-04): info_basica BIGINT, igual que en la etapa 9. Esta
+-- tabla NO se recrea: es la final y la lee En Linea. Aqui solo cambia para
+-- los ambientes nuevos; en los existentes la migra, conservando los datos,
+-- bdm_datos.sp_rcn_ctl_nov_migrar_info_basica (pgm), que el deploy de dt
+-- invoca primero y que no hace nada si la columna ya es BIGINT.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS bdm_datos.mat_info_ubicacion_mock (
   cod_tipo_ident_fte              VARCHAR(20),
@@ -176,7 +192,7 @@ CREATE TABLE IF NOT EXISTS bdm_datos.mat_info_ubicacion_mock (
   localidad                       VARCHAR(100),
   codigo_postal                   VARCHAR(20),
   clase                           VARCHAR(5),
-  info_basica                     INTEGER,
+  info_basica                     BIGINT,
   codigo_dane                     VARCHAR(20),
   es_tipo_crr                     VARCHAR(1),
   es_tipo_res                     VARCHAR(1),

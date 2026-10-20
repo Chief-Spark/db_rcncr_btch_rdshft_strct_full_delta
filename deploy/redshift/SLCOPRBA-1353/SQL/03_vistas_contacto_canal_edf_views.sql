@@ -1,8 +1,11 @@
 -- ============================================================
 -- 03_vistas_contacto_canal.sql
--- TEL 4/5 | CEL 9 | EMA 10 desde ds_dba_rncr_batch.edf_views
--- (2026-10-20, D-EDF-08: el 8 sale de TEL, es direccion -- C6b. El canal
--- de 6, 10 y 11 sigue sin verificar: C18 y catalogo contacttype.)
+-- Canales desde ds_dba_rncr_batch.edf_views, en la columna canal:
+--   DIR 1/2/3/7/8 | TEL 4/5 y el 6 fijo | CEL 9 y el 6 celular | EMA 10
+-- 2026-10-20, medido en DEV y QA (docs/edf_views/RESULTADOS_CONSULTAS_EDF.md
+-- secciones 14 y 15): el 8 es direccion (D-EDF-08), el 10 es correo (100 %
+-- con arroba), el 6 es el telefono de la fuente 6 (D-EDF-11) y el 11 viene
+-- vacio y no se lee. Falta el catalogo contacttype para confirmarlo.
 -- ============================================================
 
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_contacto_canal;
@@ -29,10 +32,40 @@ SELECT
   FNV_HASH(xpm.pin) AS id_buro_persona,
   CAST(xpm.pin AS BIGINT) AS cod_pin_persona,
   NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') AS contact_type,
-  COALESCE(
-    NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
-    NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '')
-  ) AS valor_contacto,
+  -- 2026-10-20 (D-EDF-10): LOS TELEFONOS SE NORMALIZAN AQUI. EDF no los
+  -- estandariza (contactasreportedstandardized vacio en el 100 %, C21) y el
+  -- crudo llega RELLENADO CON CEROS hasta 12 digitos (C22, en DEV y en QA).
+  -- Con el relleno el operador salia '003', no estaba en V_Operador_Ord_Cel y
+  -- la compuerta CEL018 sacaba a todos los celulares del ranking.
+  -- No contradice al legado: el SP sigue sacando el operador con el SUBSTR
+  -- en crudo de Caracteristicas.txt:912, solo que ahora sobre un valor
+  -- equivalente al Texto_Ubicacion del AS-IS, que no venia rellenado (su
+  -- catalogo de operadores usa 300-350). El relleno es formato de EDF.
+  -- Solo digitos y sin los ceros de la izquierda; correos y direcciones no
+  -- se tocan.
+  CASE WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('4', '5', '6', '9')
+       THEN NULLIF(LTRIM(REGEXP_REPLACE(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
+                 NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '')), '[^0-9]', ''), '0'), '')
+       ELSE COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
+                 NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), ''))
+  END AS valor_contacto,
+  -- 2026-10-20 (D-EDF-11): el canal se decide aqui, una vez, y los filtros
+  -- de Ordenamiento leen esta columna en vez de repetir codigos. El 6 trae
+  -- celulares y fijos mezclados (C18: 104.851 y 23.044 en DEV; 13.684 y
+  -- 2.075 en QA): va a CEL si tiene forma de celular colombiano (10 digitos
+  -- que empiezan por 3) y a TEL si no.
+  CAST(CASE
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('1', '2', '3', '7', '8') THEN 'DIR'
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('4', '5') THEN 'TEL'
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '9' THEN 'CEL'
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '10' THEN 'EMA'
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '6'
+     AND LEN(NULLIF(LTRIM(REGEXP_REPLACE(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
+                 NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '')), '[^0-9]', ''), '0'), '')) = 10
+     AND LEFT(NULLIF(LTRIM(REGEXP_REPLACE(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
+                 NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '')), '[^0-9]', ''), '0'), ''), 1) = '3' THEN 'CEL'
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '6' THEN 'TEL'
+  END AS VARCHAR(3)) AS canal,
   COALESCE(
     NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedtextoubicacion"::VARCHAR), ''),
     NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
@@ -125,7 +158,7 @@ LEFT JOIN ( SELECT d0.id,
              GROUP BY d0.id ) dir
   ON dir.id = ci.id
 WHERE NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN
-  ('1','2','3','4','5','7','8','9','10')
+  ('1','2','3','4','5','6','7','8','9','10')
   -- 2026-10-20 (D-EDF-01, PROVISIONAL): fuera los contactos de un reporte
   -- bloqueado. Las direcciones llevan la bandera en la RPU y los SP las
   -- excluyen por anti-join; los canales no tienen esa bandera aguas abajo,
