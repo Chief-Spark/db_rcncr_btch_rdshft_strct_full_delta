@@ -30,14 +30,18 @@ SORTKEY (ambiente, parametro);
 -- bdm_datos.geo_lote_control  -- PERMANENTE (control de Lote)
 -- Maquina de estados y control de reintentos (Req 7.4, 13.1, 13.2, 13.4).
 -- Estados de negocio:  exportado | procesado por ArcGIS_Externo | cargado
--- Estados operativos:  fallido | fallido definitivo
+-- Estados operativos:  fallido | fallido definitivo | vencido
+-- 2026-10-20 (GEO no bloqueante): 'vencido' es un Lote que siguio en
+-- 'exportado' mas de dias_espera_arcgis dias sin respuesta de ArcGIS; sus
+-- candidatos vuelven a exportarse. Los 'fallido' tambien (antes quedaban
+-- excluidos para siempre).
 -- DISTSTYLE ALL: tabla pequena (una fila por Lote) consultada por todos
 -- los SPs; se replica en cada nodo para joins baratos. Estado unico por
 -- Lote satisface Req 7.4.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS bdm_datos.geo_lote_control (
   lote                 INTEGER      NOT NULL,
-  estado               VARCHAR(40)  NOT NULL,  -- exportado | procesado por ArcGIS_Externo | cargado | fallido | fallido definitivo
+  estado               VARCHAR(40)  NOT NULL,  -- exportado | procesado por ArcGIS_Externo | cargado | fallido | fallido definitivo | vencido
   fase_fallo           VARCHAR(40),            -- exportacion | georreferenciacion | distancias | reenganche_r3
   conteo_esperado      INTEGER,
   conteo_cargado       INTEGER,
@@ -178,4 +182,37 @@ FROM (
   SELECT 'DEV',  'retry_backoff_seconds','300'
 ) v
 WHERE NOT EXISTS (SELECT 1 FROM bdm_datos.geo_config LIMIT 1);
+
+-- ------------------------------------------------------------
+-- 2026-10-20 (GEO no bloqueante): dos parametros nuevos.
+--   s3_output_prefix    donde ArcGIS deja los resultados (Salida_Geo.pdf:
+--                       reconocer_output/, archivos geo_result_* y
+--                       distancias_result_*). Lo lee sp_rcn_geo_02_buscar_
+--                       resultados.
+--   dias_espera_arcgis  dias que un Lote puede seguir en 'exportado' sin
+--                       respuesta antes de pasar a 'vencido' y reexportar
+--                       sus candidatos. Lo lee sp_geo_exportar_insumo.
+-- VAN EN UN INSERT APARTE Y CON GUARDA POR PARAMETRO: el seed de arriba solo
+-- siembra una tabla vacia, de modo que en un ambiente ya desplegado no
+-- entrarian nunca (mismo patron que s3_enabled en 03b_ddl_geo_mock.sql).
+-- Los dos SP usan un valor por defecto si el parametro falta: nunca fallan
+-- por esto.
+-- ------------------------------------------------------------
+INSERT INTO bdm_datos.geo_config (ambiente, parametro, valor)
+SELECT a.ambiente, p.parametro, p.valor
+FROM (
+  SELECT 'PROD' AS ambiente UNION ALL
+  SELECT 'UAT'              UNION ALL
+  SELECT 'TEST'             UNION ALL
+  SELECT 'DEV'
+) a
+CROSS JOIN (
+  SELECT 's3_output_prefix' AS parametro, 'reconocer_output/' AS valor UNION ALL
+  SELECT 'dias_espera_arcgis',            '7'
+) p
+WHERE NOT EXISTS (
+  SELECT 1 FROM bdm_datos.geo_config c
+  WHERE c.ambiente = a.ambiente
+    AND c.parametro = p.parametro
+);
 

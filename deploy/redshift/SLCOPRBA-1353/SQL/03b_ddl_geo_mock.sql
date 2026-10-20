@@ -177,10 +177,12 @@ WHERE NOT EXISTS (SELECT 1 FROM bdm_datos.geo_config_mock LIMIT 1);
 -- desde aqui, y todo el SQL de abajo (conciliacion de tipos, rechazos,
 -- UPDATEs) es identico.
 --
--- Del contrato de 32 columnas, el cargador solo lee cinco:
---   col01 Cod_DW_Ubic | col02 Lote | col03 Status (M/U)
---   col05 Latitud     | col06 Longitud
--- Las otras 27 existen para que la forma coincida; van NULL.
+-- Del contrato de 32 columnas (Salida_Geo.pdf, 2026-10-20) el cargador lee:
+--   col01 Cod_DW_Ubic | col02 Lote | col05 Descripcion_Proceso (GEOCODE)
+--   col12 Latitud     | col13 Longitud | col26 Status (M/U)
+-- Las demas existen para que la forma coincida; van NULL. Hasta el
+-- 2026-10-20 el simulador y los cargadores usaban Status en col03 y
+-- latitud/longitud en col05/col06, que no es el contrato (D-EDF-05).
 --
 -- col02 es la llave de filtrado: el cargador toma del "archivo" solo las
 -- filas cuyo Lote coincide con el que esta procesando, igual que el contrato
@@ -193,17 +195,17 @@ CREATE SCHEMA IF NOT EXISTS bdm_stage;
 CREATE TABLE IF NOT EXISTS bdm_stage.mock_geo_respuesta (
   col01  VARCHAR(500),   -- Cod_DW_Ubic
   col02  VARCHAR(500),   -- Lote
-  col03  VARCHAR(500),   -- Status (M | U)
-  col04  VARCHAR(500),
-  col05  VARCHAR(500),   -- Latitud
-  col06  VARCHAR(500),   -- Longitud
+  col03  VARCHAR(500),   -- Direccion
+  col04  VARCHAR(500),   -- Cod_Dane_Ciudad
+  col05  VARCHAR(500),   -- Descripcion_Proceso (GEOCODE)
+  col06  VARCHAR(500),   -- Zona
   col07  VARCHAR(500),
   col08  VARCHAR(500),
   col09  VARCHAR(500),
   col10  VARCHAR(500),
   col11  VARCHAR(500),
-  col12  VARCHAR(500),
-  col13  VARCHAR(500),
+  col12  VARCHAR(500),   -- Latitud
+  col13  VARCHAR(500),   -- Longitud
   col14  VARCHAR(500),
   col15  VARCHAR(500),
   col16  VARCHAR(500),
@@ -216,7 +218,7 @@ CREATE TABLE IF NOT EXISTS bdm_stage.mock_geo_respuesta (
   col23  VARCHAR(500),
   col24  VARCHAR(500),
   col25  VARCHAR(500),
-  col26  VARCHAR(500),
+  col26  VARCHAR(500),   -- Status (M | U)
   col27  VARCHAR(500),
   col28  VARCHAR(500),
   col29  VARCHAR(500),
@@ -250,4 +252,24 @@ FROM (
 WHERE NOT EXISTS (
   SELECT 1 FROM bdm_datos.geo_config_mock c
   WHERE c.parametro = 's3_enabled'
+);
+
+-- 2026-10-20 (GEO no bloqueante): los dos parametros nuevos de geo_config,
+-- con el mismo guarda por parametro. Ver 03_ddl_geo.sql.
+INSERT INTO bdm_datos.geo_config_mock (ambiente, parametro, valor)
+SELECT a.ambiente, p.parametro, p.valor
+FROM (
+  SELECT 'PROD' AS ambiente UNION ALL
+  SELECT 'UAT'              UNION ALL
+  SELECT 'TEST'             UNION ALL
+  SELECT 'DEV'
+) a
+CROSS JOIN (
+  SELECT 's3_output_prefix' AS parametro, 'reconocer_output/' AS valor UNION ALL
+  SELECT 'dias_espera_arcgis',            '7'
+) p
+WHERE NOT EXISTS (
+  SELECT 1 FROM bdm_datos.geo_config_mock c
+  WHERE c.ambiente = a.ambiente
+    AND c.parametro = p.parametro
 );
