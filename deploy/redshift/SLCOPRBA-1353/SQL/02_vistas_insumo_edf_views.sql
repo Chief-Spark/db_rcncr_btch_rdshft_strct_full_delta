@@ -16,9 +16,36 @@ CREATE OR REPLACE VIEW bdm_tempo.v_xpm_contacto_direccion AS
 SELECT
   xpm.pin,
   CAST(NULL AS BIGINT)              AS relationalizelastupdate,
-  loc.id                            AS cod_dw_ubic,
-  ci.id                             AS cod_dw_persona_ubic,
-  ci.id                             AS cod_dw_direccion_fisica,
+  -- 2026-10-20 (D-EDF-07, D-UNI-02): LLAVES REHECHAS. Antes eran
+  -- cod_dw_ubic = loc.id y cod_dw_persona_ubic = ci.id, y las dos estaban mal:
+  --   * loc.id es el arreglo de location de la PERSONA (98.586 id para 98.586
+  --     personas, C4c): todas las direcciones de una persona compartian
+  --     cod_dw_ubic, y R1/R2/R3, que agrupan por cod_dw_ubic, las trataban
+  --     como el mismo lugar aunque el texto fuera distinto.
+  --   * ci.id es el REPORTE, que trae ~4 contactos de distinto tipo (C4b).
+  -- Ahora, como en el mock (seed_mock_matriz.sql:29-33) y en el AS-IS:
+  --   cod_dw_persona_ubic = el contacto, (ci.id, ci.index), unico en los
+  --     568.544 contactos reales (C4a). FNV_HASH, igual que las llaves que ya
+  --     genera el motor de la R2 (sp_unificacion_r2_motor_nit_...:364-365).
+  --   cod_dw_direccion_fisica = el mismo valor, 1:1 con su complemento.
+  --   cod_dw_ubic = el LUGAR: texto estandarizado + DANE (o la ciudad si no
+  --     hay DANE). Dos personas que reportan la misma direccion comparten
+  --     cod_dw_ubic, como en el maestro de ubicaciones del legado. Sin texto
+  --     no hay lugar que compartir y cae a la llave del contacto.
+  CASE
+    WHEN COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedtextoubicacion"::VARCHAR), ''),
+               NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
+               NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '')) IS NULL
+    THEN FNV_HASH(CAST(ci.id AS VARCHAR) || ':' || CAST(ci."index" AS VARCHAR))
+    ELSE FNV_HASH(UPPER(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedtextoubicacion"::VARCHAR), ''),
+               NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
+               NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '')))
+                  || '|' || COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), ''),
+                                     UPPER(NULLIF(TRIM(ci."location.val.contactinformations.val.cityname"::VARCHAR), '')),
+                                     ''))
+  END                               AS cod_dw_ubic,
+  FNV_HASH(CAST(ci.id AS VARCHAR) || ':' || CAST(ci."index" AS VARCHAR)) AS cod_dw_persona_ubic,
+  FNV_HASH(CAST(ci.id AS VARCHAR) || ':' || CAST(ci."index" AS VARCHAR)) AS cod_dw_direccion_fisica,
   FNV_HASH(xpm.pin)                 AS id_buro_persona,
   CAST(xpm.pin AS BIGINT)           AS cod_pin_persona,
   CASE
@@ -52,8 +79,9 @@ SELECT
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') ~ '^[0-9]+$'
      AND CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') AS BIGINT) <= 2147483647
     THEN CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') AS INTEGER)
-    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.cityname"::VARCHAR), '') IS NOT NULL
-    THEN MOD(ABS(FNV_HASH(UPPER(TRIM(ci."location.val.contactinformations.val.cityname"::VARCHAR)))), 99999999)
+    -- 2026-10-20 (D-EDF-02): sin DANE, NULL. Antes caia a un hash de cityname,
+    -- que inventaba una ciudad y mezclaba claves DANE con valores de hash.
+    -- Hoy falta en ~37 % de las direcciones (C6c); citycode puede suplirlo (C18).
     ELSE NULL
   END AS cod_dw_ciudad,
   COALESCE(
@@ -98,7 +126,13 @@ SELECT
   -- trae VARCHAR(20) igual que bdm_datos.rpu_generada.
   CAST(NULLIF(TRIM(loc."location.val.personidtype"::VARCHAR), '') AS VARCHAR(20))
     AS cod_tipo_ident_fte,
-  CAST(NULL AS INTEGER) AS lote
+  CAST(NULL AS INTEGER) AS lote,
+  -- 2026-10-20 (D-EDF-01, regla PROVISIONAL): bloqueado si el reporte trae
+  -- razon de bloqueo distinta de vacio y de '0'. En location y en cuentas el
+  -- estado 1 va siempre con razon 0 (C7, C13): subscriberblockstatus = 1 es
+  -- "sin bloqueo". Los SP excluyen el id entero con anti-join, como el legado.
+  CASE WHEN COALESCE(NULLIF(TRIM(loc."location.val.blockreason"::VARCHAR), ''), '0') <> '0'
+       THEN 1 ELSE 0 END AS bloqueado
 FROM ds_dba_rncr_batch.edf_views.xpm xpm
 INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location loc
   ON xpm.location = loc.id
@@ -192,7 +226,7 @@ FROM (
     CAST(fecha_relacion_persona_ubicaci AS DATE)     AS fecha_relacion_persona_ubicaci,
     CAST(lote                           AS INTEGER)  AS lote,
     CAST(cod_tipo_ident_fte          AS VARCHAR(20)) AS cod_tipo_ident_fte,
-    CAST(0                              AS SMALLINT) AS bloqueado
+    CAST(bloqueado                      AS SMALLINT) AS bloqueado
   FROM bdm_tempo.v_xpm_contacto_direccion
   UNION ALL
   SELECT
@@ -240,22 +274,34 @@ WITH NO SCHEMA BINDING;
 -- ORDEN DE DESPLIEGUE: geo_atributos la crea 03_ddl_geo.sql, que corre DESPUES
 -- de este script. No importa porque la vista es WITH NO SCHEMA BINDING y no
 -- resuelve sus referencias al crearse; nada la consulta entre los dos pasos.
+-- 2026-10-20: UNA FILA POR LUGAR. Con cod_dw_ubic = texto + DANE, varios
+-- contactos comparten lugar y pueden diferir en lo demas (texto original,
+-- score, tipo). Un DISTINCT dejaria varias filas por cod_dw_ubic y cada join
+-- de R1/R2/R3 contra esta vista se multiplicaria. Se toma la del contacto de
+-- menor llave, que es deterministica.
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_ubicacion_estandarizada AS
-SELECT DISTINCT
+SELECT
   cd.cod_dw_ubic,
   cd.texto_ubicacion,
   cd.texto_ubicacion_normalizado,
   cd.texto_ubicacion_original,
   cd.score_estandarizacion,
   cd.cod_dw_ciudad,
-  cd.cod_dw_ciudad AS cod_dw_municipio,
+  -- 2026-10-20 (D-UNI-06): el DANE de EDF es el centro poblado de 8 digitos
+  -- (C6c); el municipio son sus 5 primeros. El INTEGER ya perdio el cero
+  -- inicial, de modo que la division entera da el codigo correcto:
+  -- 05001000 -> 5001000 / 1000 = 5001 = 05001.
+  cd.cod_dw_ciudad / 1000 AS cod_dw_municipio,
   cd.departamento,
   cd.municipio,
   cd.tipo_ubicacion,
   cd.cod_dw_tipo_ubicacion_dir AS cod_dw_tipo_ubicacion,
   COALESCE(cd.latitud,  g.latitud)  AS latitud,
   COALESCE(cd.longitud, g.longitud) AS longitud
-FROM bdm_tempo.v_xpm_contacto_direccion cd
+FROM ( SELECT cd0.*,
+              ROW_NUMBER() OVER (PARTITION BY cd0.cod_dw_ubic
+                                 ORDER BY cd0.cod_dw_persona_ubic) AS rn_ubic
+         FROM bdm_tempo.v_xpm_contacto_direccion cd0 ) cd
 LEFT JOIN (
   SELECT cod_dw_ubic, latitud, longitud
   FROM ( SELECT cod_dw_ubic, latitud, longitud,
@@ -265,6 +311,7 @@ LEFT JOIN (
           WHERE latitud IS NOT NULL AND longitud IS NOT NULL ) z
   WHERE rn = 1
 ) g ON g.cod_dw_ubic = cd.cod_dw_ubic
+WHERE cd.rn_ubic = 1
 WITH NO SCHEMA BINDING;
 
 -- SLCOPRBA-1354 (M2): la vista pasa a ser UNION ALL del datashare con las
@@ -315,21 +362,32 @@ WITH NO SCHEMA BINDING;
 
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_reporte_relacion_persona_ubica AS
 SELECT
-  ci.id AS cod_dw_persona_ubic,
+  -- 2026-10-20: la misma llave de contacto que v_xpm_contacto_direccion.
+  FNV_HASH(CAST(ci.id AS VARCHAR) || ':' || CAST(ci."index" AS VARCHAR)) AS cod_dw_persona_ubic,
+  -- 2026-10-20 (D-EDF-03): SUSCRIPTOR EN TRES NIVELES, sin hash y sin
+  -- multiplicar filas. Antes mandaba la contraparte de la PERSONA, igual para
+  -- todos sus reportes, y caia a una cubeta de hash; ademas el join por
+  -- persona repetia cada reporte tantas veces como contrapartes (hasta x57,
+  -- C15). Ahora:
+  --   1. el suscriptor del propio reporte (solo el 4,9 % lo trae en DEV, C16);
+  --   2. si falta y la persona tiene UNA sola contraparte, esa (el subquery cp
+  --      deja una fila por persona o ninguna);
+  --   3. si no, NULL: no se inventa una entidad.
+  -- PENDIENTE C19: si la contraparte de la persona resulta ser la fuente y no
+  -- un suscriptor, el nivel 2 se quita y queda solo el 1.
   COALESCE(
-    CASE
-      WHEN NULLIF(TRIM(cp."counterparties.val.counterpartyidnumber"::VARCHAR), '') ~ '^[0-9]+$'
-       AND CAST(NULLIF(TRIM(cp."counterparties.val.counterpartyidnumber"::VARCHAR), '') AS BIGINT) <= 2147483647
-      THEN CAST(NULLIF(TRIM(cp."counterparties.val.counterpartyidnumber"::VARCHAR), '') AS INTEGER)
-      ELSE NULL
-    END,
     CASE
       WHEN NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') ~ '^[0-9]+$'
        AND CAST(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') AS BIGINT) <= 2147483647
       THEN CAST(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') AS INTEGER)
       ELSE NULL
     END,
-    MOD(ABS(FNV_HASH(xpm.pin || ':' || ci.id::VARCHAR)), 9998) + 1
+    CASE
+      WHEN cp.counterpartyidnumber ~ '^[0-9]+$'
+       AND CAST(cp.counterpartyidnumber AS BIGINT) <= 2147483647
+      THEN CAST(cp.counterpartyidnumber AS INTEGER)
+      ELSE NULL
+    END
   ) AS id_buro_suscriptor,
   -- SLCOPRBA-1355: el codigo de suscriptor EN CRUDO, aparte de
   -- id_buro_suscriptor. Las dos columnas NO son la misma cosa: id_buro_suscriptor
@@ -356,7 +414,12 @@ INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location loc
   ON xpm.location = loc.id
 INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location_val_contactinformations ci
   ON loc."location.val.contactinformations" = ci.id
-LEFT JOIN ds_dba_rncr_batch.edf_views.xpm_counterparties cp
+LEFT JOIN ( SELECT c0.id,
+                   MAX(NULLIF(TRIM(c0."counterparties.val.counterpartyidnumber"::VARCHAR), '')) AS counterpartyidnumber
+              FROM ds_dba_rncr_batch.edf_views.xpm_counterparties c0
+             WHERE c0."index" IS NOT NULL
+             GROUP BY c0.id
+            HAVING COUNT(*) = 1 ) cp
   ON xpm.counterparties = cp.id
 WHERE NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('1', '2', '3', '7', '8')
 WITH NO SCHEMA BINDING;

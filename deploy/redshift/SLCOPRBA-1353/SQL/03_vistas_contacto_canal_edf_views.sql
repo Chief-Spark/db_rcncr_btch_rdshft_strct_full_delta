@@ -1,6 +1,8 @@
 -- ============================================================
 -- 03_vistas_contacto_canal.sql
--- TEL 4/5/8 | CEL 9 | EMA 10 desde ds_dba_rncr_batch.edf_views
+-- TEL 4/5 | CEL 9 | EMA 10 desde ds_dba_rncr_batch.edf_views
+-- (2026-10-20, D-EDF-08: el 8 sale de TEL, es direccion -- C6b. El canal
+-- de 6, 10 y 11 sigue sin verificar: C18 y catalogo contacttype.)
 -- ============================================================
 
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_contacto_canal;
@@ -8,7 +10,22 @@ DROP VIEW IF EXISTS bdm_tempo.v_xpm_persona_dir_ganadora;
 
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_contacto_canal AS
 SELECT
-  ci.id AS cod_dw_persona_ubic,
+  -- 2026-10-20 (D-EDF-07): la llave cambia en v_xpm_contacto_direccion de
+  -- ci.id (el reporte) a (ci.id, ci.index) (el contacto). Aqui NO se usa la
+  -- del propio contacto: Ordenamiento enlaza cada telefono, celular o correo
+  -- con la direccion de SU MISMO REPORTE por igualdad de cod_dw_persona_ubic
+  -- (sp_ordenamiento_preparar_insumos_edf.sql:342,
+  -- sp_ordenamiento_ubicaciones_edf.sql:238,245). Antes ese enlace salia
+  -- gratis porque los dos compartian ci.id. Ahora se apunta a la direccion
+  -- del reporte (la de menor index si trae varias); una direccion se apunta
+  -- a si misma, y un reporte sin direccion cae a la llave del contacto, que
+  -- no enlaza con nada, igual que antes.
+  -- La llave propia de cada contacto de canal (una RPU por telefono, como en
+  -- el AS-IS) es D-ORD-10 y va con el lugar por canal (F5).
+  CASE WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('1', '2', '3', '7', '8')
+       THEN FNV_HASH(CAST(ci.id AS VARCHAR) || ':' || CAST(ci."index" AS VARCHAR))
+       ELSE COALESCE(dir.cod_rpu_dir, FNV_HASH(CAST(ci.id AS VARCHAR) || ':' || CAST(ci."index" AS VARCHAR)))
+  END AS cod_dw_persona_ubic,
   FNV_HASH(xpm.pin) AS id_buro_persona,
   CAST(xpm.pin AS BIGINT) AS cod_pin_persona,
   NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') AS contact_type,
@@ -34,20 +51,30 @@ SELECT
     )
     ELSE NULL
   END AS fecha_contacto,
+  -- 2026-10-20 (D-EDF-03): SUSCRIPTOR EN TRES NIVELES, sin hash y sin
+  -- multiplicar filas. Antes mandaba la contraparte de la PERSONA, igual para
+  -- todos sus reportes, y caia a una cubeta de hash; ademas el join por
+  -- persona repetia cada reporte tantas veces como contrapartes (hasta x57,
+  -- C15). Ahora:
+  --   1. el suscriptor del propio reporte (solo el 4,9 % lo trae en DEV, C16);
+  --   2. si falta y la persona tiene UNA sola contraparte, esa (el subquery cp
+  --      deja una fila por persona o ninguna);
+  --   3. si no, NULL: no se inventa una entidad.
+  -- PENDIENTE C19: si la contraparte de la persona resulta ser la fuente y no
+  -- un suscriptor, el nivel 2 se quita y queda solo el 1.
   COALESCE(
-    CASE
-      WHEN NULLIF(TRIM(cp."counterparties.val.counterpartyidnumber"::VARCHAR), '') ~ '^[0-9]+$'
-       AND CAST(NULLIF(TRIM(cp."counterparties.val.counterpartyidnumber"::VARCHAR), '') AS BIGINT) <= 2147483647
-      THEN CAST(NULLIF(TRIM(cp."counterparties.val.counterpartyidnumber"::VARCHAR), '') AS INTEGER)
-      ELSE NULL
-    END,
     CASE
       WHEN NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') ~ '^[0-9]+$'
        AND CAST(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') AS BIGINT) <= 2147483647
       THEN CAST(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') AS INTEGER)
       ELSE NULL
     END,
-    MOD(ABS(FNV_HASH(xpm.pin || ':' || ci.id::VARCHAR)), 9998) + 1
+    CASE
+      WHEN cp.counterpartyidnumber ~ '^[0-9]+$'
+       AND CAST(cp.counterpartyidnumber AS BIGINT) <= 2147483647
+      THEN CAST(cp.counterpartyidnumber AS INTEGER)
+      ELSE NULL
+    END
   ) AS id_buro_suscriptor,
   -- SLCOPRBA-1355: el codigo de suscriptor EN CRUDO, aparte de
   -- id_buro_suscriptor. Las dos columnas NO son la misma cosa: id_buro_suscriptor
@@ -83,10 +110,28 @@ INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location loc
   ON xpm.location = loc.id
 INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location_val_contactinformations ci
   ON loc."location.val.contactinformations" = ci.id
-LEFT JOIN ds_dba_rncr_batch.edf_views.xpm_counterparties cp
+LEFT JOIN ( SELECT c0.id,
+                   MAX(NULLIF(TRIM(c0."counterparties.val.counterpartyidnumber"::VARCHAR), '')) AS counterpartyidnumber
+              FROM ds_dba_rncr_batch.edf_views.xpm_counterparties c0
+             WHERE c0."index" IS NOT NULL
+             GROUP BY c0.id
+            HAVING COUNT(*) = 1 ) cp
   ON xpm.counterparties = cp.id
+LEFT JOIN ( SELECT d0.id,
+                   FNV_HASH(CAST(d0.id AS VARCHAR) || ':'
+                            || CAST(MIN(CAST(d0."index" AS INTEGER)) AS VARCHAR)) AS cod_rpu_dir
+              FROM ds_dba_rncr_batch.edf_views.xpm_location_val_contactinformations d0
+             WHERE NULLIF(TRIM(d0."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('1', '2', '3', '7', '8')
+             GROUP BY d0.id ) dir
+  ON dir.id = ci.id
 WHERE NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN
   ('1','2','3','4','5','7','8','9','10')
+  -- 2026-10-20 (D-EDF-01, PROVISIONAL): fuera los contactos de un reporte
+  -- bloqueado. Las direcciones llevan la bandera en la RPU y los SP las
+  -- excluyen por anti-join; los canales no tienen esa bandera aguas abajo,
+  -- asi que se filtran aqui. El efecto es el mismo: el legado excluye el
+  -- contacto entero.
+  AND COALESCE(NULLIF(TRIM(loc."location.val.blockreason"::VARCHAR), ''), '0') = '0'
 WITH NO SCHEMA BINDING;
 
 -- Personas con DIR ganadora post-unificacion (vista; no tabla local)

@@ -122,7 +122,8 @@ LEFT JOIN (
   WHERE COALESCE(r.ind_unificacion, 0) <> 1
   GROUP BY 1
 ) ref ON ref.id_buro_persona = c.id_buro_persona
-WHERE c.contact_type IN ('4', '5', '8')
+-- 2026-10-20 (D-EDF-08): sin el 8, que es direccion (C6b).
+WHERE c.contact_type IN ('4', '5')
   AND c.valor_contacto IS NOT NULL
 WITH NO SCHEMA BINDING;
 
