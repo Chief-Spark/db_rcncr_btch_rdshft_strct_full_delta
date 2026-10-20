@@ -1,8 +1,8 @@
 -- ============================================================
 -- 03_vistas_contacto_canal.sql
 -- Canales desde ds_dba_rncr_batch.edf_views, en la columna canal:
---   DIR 1/2/3/7/8 | TEL 4/5 y el 6 y 13 fijos | CEL 9 y el 6 y 13 celulares
---   | EMA 10/14
+--   DIR 1/2/3/7/8 | TEL 4/5/6/13 fijos | CEL 9 y 4/5/6/13 con forma de
+--   celular | EMA 10/14
 -- 2026-10-20: CONFIRMADO con el catalogo OFICIAL de contactType
 -- (docs/edf_views/RESULTADOS_CONSULTAS_EDF.md seccion 16), que coincide con
 -- lo medido en DEV y QA (secciones 14 y 15). 1 Residence, 2 Labor y
@@ -59,20 +59,22 @@ SELECT
   -- de Ordenamiento leen esta columna en vez de repetir codigos. El 6 trae
   -- celulares y fijos mezclados (C18: 104.851 y 23.044 en DEV; 13.684 y
   -- 2.075 en QA): va a CEL si tiene forma de celular colombiano (10 digitos
-  -- que empiezan por 3) y a TEL si no. El 13 (Notification Phone) igual: el
-  -- catalogo no dice si es fijo o celular. Business Telephone dice el USO del
-  -- numero, no la tecnologia, y el 78 % del 6 tiene forma de celular (C18).
+  -- que empiezan por 3) y a TEL si no. La misma regla vale para el 4, el 5 y
+  -- el 13: el catalogo dice el USO del numero (Residence, Labor, Business,
+  -- Notification Telephone), no si es fijo o celular, y desde 2021 los fijos
+  -- colombianos son 60X de 10 digitos, de modo que un 3XX de 10 es movil.
+  -- C23: el 12 % del 4 y el 11 % del 5 en DEV (10,6 % y 7,2 % en QA) son
+  -- celulares. El tipo (residencia, laboral) se conserva en contact_type.
   CAST(CASE
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('1', '2', '3', '7', '8') THEN 'DIR'
-    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('4', '5') THEN 'TEL'
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '9' THEN 'CEL'
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('10', '14') THEN 'EMA'
-    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('6', '13')
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('4', '5', '6', '13')
      AND LEN(NULLIF(LTRIM(REGEXP_REPLACE(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
                  NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '')), '[^0-9]', ''), '0'), '')) = 10
      AND LEFT(NULLIF(LTRIM(REGEXP_REPLACE(COALESCE(NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreportedstandardized"::VARCHAR), ''),
                  NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '')), '[^0-9]', ''), '0'), ''), 1) = '3' THEN 'CEL'
-    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('6', '13') THEN 'TEL'
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('4', '5', '6', '13') THEN 'TEL'
   END AS VARCHAR(3)) AS canal,
   COALESCE(
     NULLIF(TRIM(ci."location.val.contactinformations.val.standardizedtextoubicacion"::VARCHAR), ''),
