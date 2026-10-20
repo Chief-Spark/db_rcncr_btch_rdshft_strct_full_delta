@@ -167,14 +167,25 @@ LEFT JOIN ( SELECT d0.id,
              WHERE NULLIF(TRIM(d0."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('1', '2', '3', '7', '8')
              GROUP BY d0.id ) dir
   ON dir.id = ci.id
+-- 2026-10-20 (D-EDF-01): cuenta bloqueada del reporte, la misma regla que
+-- lleva la bandera de las direcciones (02_vistas_insumo_edf_views.sql,
+-- v_xpm_cuenta_bloqueada).
+LEFT JOIN bdm_tempo.v_xpm_cuenta_bloqueada cbq
+  ON cbq.ba_id    = xpm.bestaccounts
+ AND cbq.linea    = NULLIF(TRIM(loc."location.val.businesslinecode"::VARCHAR), '')
+ AND cbq.tipo_cta = NULLIF(TRIM(loc."location.val.accounttype"::VARCHAR), '')
+ AND cbq.num_cta  = NULLIF(TRIM(loc."location.val.accountnumber"::VARCHAR), '')
+ AND cbq.tipo_doc = NULLIF(TRIM(loc."location.val.personidtype"::VARCHAR), '')
+ AND cbq.num_doc  = NULLIF(TRIM(loc."location.val.personidnumber"::VARCHAR), '')
 WHERE NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN
   ('1','2','3','4','5','6','7','8','9','10','13','14')
-  -- 2026-10-20 (D-EDF-01, PROVISIONAL): fuera los contactos de un reporte
-  -- bloqueado. Las direcciones llevan la bandera en la RPU y los SP las
-  -- excluyen por anti-join; los canales no tienen esa bandera aguas abajo,
-  -- asi que se filtran aqui. El efecto es el mismo: el legado excluye el
-  -- contacto entero.
+  -- 2026-10-20 (D-EDF-01): fuera los contactos de un reporte bloqueado, por
+  -- suscriptor (razon distinta de 0) o por cuenta (blockSeverity = 1). Las
+  -- direcciones llevan la bandera en la RPU y los SP las excluyen por
+  -- anti-join; los canales no tienen esa bandera aguas abajo, asi que se
+  -- filtran aqui. El efecto es el mismo: el legado excluye el contacto entero.
   AND COALESCE(NULLIF(TRIM(loc."location.val.blockreason"::VARCHAR), ''), '0') = '0'
+  AND cbq.ba_id IS NULL
 WITH NO SCHEMA BINDING;
 
 -- Personas con DIR ganadora post-unificacion (vista; no tabla local)

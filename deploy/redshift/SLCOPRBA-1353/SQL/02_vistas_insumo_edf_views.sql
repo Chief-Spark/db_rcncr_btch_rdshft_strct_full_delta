@@ -11,6 +11,35 @@ DROP VIEW IF EXISTS bdm_tempo.v_xpm_direccion_fisica;
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_ubicacion_estandarizada;
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_relacion_persona_ubicacion;
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_contacto_direccion;
+DROP VIEW IF EXISTS bdm_tempo.v_xpm_cuenta_bloqueada;
+
+-- 2026-10-20 (D-EDF-01): CUENTAS BLOQUEADAS, una fila por llave. Es el
+-- V_BLOQUEO del AS-IS, que es de cuenta (V_Razon_Bloqueo habla de la historia
+-- de credito: reclamos, prescripcion, obligaciones cerradas) y excluye la RPU
+-- entera en Unificacion, Ordenamiento y Novedades. En EDF es
+-- bestAccounts.blockSeverity = 1 (indicador de bloqueo 1-7, todos "no se
+-- muestra"), lo mismo que Experian quita de LOCATION a sus productos (Data
+-- Provisioning - Filters). La severidad 2 (reclamo vencido, cuenta sin validar
+-- ante la Registraduria) mezcla una razon que se oculta y otra que se muestra:
+-- se deja pasar hasta que Experian responda.
+-- La llave es la de Data Provisioning: linea de negocio, tipo y numero de
+-- cuenta, tipo y numero de documento, dentro del arreglo de cuentas de la
+-- persona (ba_id = xpm.bestaccounts). La leen v_xpm_contacto_direccion y
+-- v_xpm_contacto_canal: una sola definicion para que no deriven. El DISTINCT
+-- sobre las seis columnas de la llave deja una fila por llave, de modo que el
+-- LEFT JOIN de los consumidores no puede multiplicar contactos.
+CREATE OR REPLACE VIEW bdm_tempo.v_xpm_cuenta_bloqueada AS
+SELECT DISTINCT
+       ba.id                                                              AS ba_id,
+       NULLIF(TRIM(ba."bestaccounts.val.businesslinecode"::VARCHAR), '') AS linea,
+       NULLIF(TRIM(ba."bestaccounts.val.accounttype"::VARCHAR), '')      AS tipo_cta,
+       NULLIF(TRIM(ba."bestaccounts.val.accountnumber"::VARCHAR), '')    AS num_cta,
+       NULLIF(TRIM(ba."bestaccounts.val.personidtype"::VARCHAR), '')     AS tipo_doc,
+       NULLIF(TRIM(ba."bestaccounts.val.personidnumber"::VARCHAR), '')   AS num_doc
+  FROM ds_dba_rncr_batch.edf_views.xpm_bestaccounts ba
+ WHERE ba."index" IS NOT NULL
+   AND NULLIF(TRIM(ba."bestaccounts.val.blockseverity"::VARCHAR), '') = '1'
+WITH NO SCHEMA BINDING;
 
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_contacto_direccion AS
 SELECT
@@ -84,10 +113,27 @@ SELECT
   ) AS texto_ubicacion_normalizado,
   NULLIF(TRIM(ci."location.val.contactinformations.val.contactasreported"::VARCHAR), '') AS texto_ubicacion_original,
   CASE
-    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contactasstandardizedscore"::VARCHAR), '') ~ '^[0-9]+(\.[0-9]+)?$'
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contactasstandardizedscore"::VARCHAR), '') ~ '^[0-9](\.[0-9]+)?$'
     THEN CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.contactasstandardizedscore"::VARCHAR), '') AS DECIMAL(5,4))
     ELSE NULL
   END AS score_estandarizacion,
+  -- 2026-10-20: el patron admite UN digito entero. La escala es 0-1 (C24) y
+  -- un "96" de otra escala habria desbordado el DECIMAL(5,4) y abortado la
+  -- vista entera; ahora queda en NULL.
+  -- 2026-10-20 (D-EDF-12, umbral del negocio): la gestion de registro del
+  -- legado (V_Gestion_Registro: VALIDA / NO VALIDA) sale del score de la
+  -- libreria de estandarizacion. VALIDA si el score es >= 0.80, NO VALIDA si
+  -- es menor y NULL si no hay score. NULL no es NO VALIDA: en DEV solo el
+  -- tipo 8 trae score (C24) y las direcciones de suscriptor (1, 2, 3) llegan
+  -- sin el; el Ordenamiento del legado cuenta NULL como valida
+  -- (Caracteristicas.txt LF 160) y Novedades lo deja pasar. Se repite la
+  -- expresion del score porque una columna no lee el alias de su vecina.
+  CAST(CASE
+    WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contactasstandardizedscore"::VARCHAR), '') ~ '^[0-9](\.[0-9]+)?$'
+    THEN CASE WHEN CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.contactasstandardizedscore"::VARCHAR), '') AS DECIMAL(5,4)) >= 0.80
+              THEN 'VALIDA' ELSE 'NO VALIDA' END
+    ELSE NULL
+  END AS VARCHAR(20)) AS descripcion_gestion_registro,
   CASE
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') ~ '^[0-9]+$'
      AND CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') AS BIGINT) <= 2147483647
@@ -153,17 +199,37 @@ SELECT
   CAST(NULLIF(TRIM(loc."location.val.personidtype"::VARCHAR), '') AS VARCHAR(20))
     AS cod_tipo_ident_fte,
   CAST(NULL AS INTEGER) AS lote,
-  -- 2026-10-20 (D-EDF-01, regla PROVISIONAL): bloqueado si el reporte trae
-  -- razon de bloqueo distinta de vacio y de '0'. En location y en cuentas el
-  -- estado 1 va siempre con razon 0 (C7, C13): subscriberblockstatus = 1 es
-  -- "sin bloqueo". Los SP excluyen el id entero con anti-join, como el legado.
+  -- 2026-10-20 (D-EDF-01): bloqueado si se cumple cualquiera de las dos.
+  --   * SUSCRIPTOR BLOQUEADO: el reporte trae razon de bloqueo distinta de
+  --     vacio y de '0'. Es el blockReason del suscriptor (subscriber.json) y
+  --     en DEV va siempre con blockStatus 0, que es "bloqueado" (C7, C13;
+  --     fichas ICBCLA e ICBSUS). La regla "razon 2 o 5" de getXPM es para los
+  --     calculos agregados del XPM, no para mostrar datos.
+  --   * CUENTA BLOQUEADA: la cuenta del reporte tiene blockSeverity = 1 en
+  --     bestAccounts (indicador 1-7: historico, caducidad, Novedat,
+  --     eliminacion logica, obligacion cerrada, registro frenado). Es el
+  --     V_BLOQUEO del AS-IS, que es de cuenta (V_Razon_Bloqueo: "no se
+  --     muestra en la Historia de Credito"), y lo que Experian quita de
+  --     LOCATION a sus productos (Data Provisioning - Filters). La severidad
+  --     2 se muestra hasta que Experian diga otra cosa. Ver
+  --     v_xpm_cuenta_bloqueada.
+  -- Los SP excluyen el id entero con anti-join, como el legado.
   CASE WHEN COALESCE(NULLIF(TRIM(loc."location.val.blockreason"::VARCHAR), ''), '0') <> '0'
+         OR cbq.ba_id IS NOT NULL
        THEN 1 ELSE 0 END AS bloqueado
 FROM ds_dba_rncr_batch.edf_views.xpm xpm
 INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location loc
   ON xpm.location = loc.id
 INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location_val_contactinformations ci
   ON loc."location.val.contactinformations" = ci.id
+-- Cuenta bloqueada del reporte (bloqueado). Ver v_xpm_cuenta_bloqueada.
+LEFT JOIN bdm_tempo.v_xpm_cuenta_bloqueada cbq
+  ON cbq.ba_id    = xpm.bestaccounts
+ AND cbq.linea    = NULLIF(TRIM(loc."location.val.businesslinecode"::VARCHAR), '')
+ AND cbq.tipo_cta = NULLIF(TRIM(loc."location.val.accounttype"::VARCHAR), '')
+ AND cbq.num_cta  = NULLIF(TRIM(loc."location.val.accountnumber"::VARCHAR), '')
+ AND cbq.tipo_doc = NULLIF(TRIM(loc."location.val.personidtype"::VARCHAR), '')
+ AND cbq.num_doc  = NULLIF(TRIM(loc."location.val.personidnumber"::VARCHAR), '')
 -- Ciudad de respaldo (ver cod_dw_ciudad): clave exacta con departamento,
 -- exacta sola, esqueleto de consonantes con departamento y esqueleto solo.
 -- Cada subconsulta deja una fila por clave y solo si la clave apunta a UNA
@@ -349,7 +415,16 @@ SELECT
   cd.texto_ubicacion,
   cd.texto_ubicacion_normalizado,
   cd.texto_ubicacion_original,
-  cd.score_estandarizacion,
+  -- 2026-10-20 (D-EDF-12): el score y la gestion son del LUGAR, como en el
+  -- legado (UBICACION_ESTANDARIZADA.Cod_DW_Gestion_Registro,
+  -- Novedad.sql:7679). Se toma el mejor score de los contactos del lugar y no
+  -- el del contacto de menor llave, que es lo que daba antes esta columna y
+  -- nadie leia: si uno de sus reportes quedo estandarizado con >= 0.80, el
+  -- lugar es VALIDA. Sin ningun score, NULL.
+  cd.score_ubic AS score_estandarizacion,
+  CAST(CASE WHEN cd.score_ubic IS NULL THEN NULL
+            WHEN cd.score_ubic >= 0.80 THEN 'VALIDA'
+            ELSE 'NO VALIDA' END AS VARCHAR(20)) AS descripcion_gestion_registro,
   cd.cod_dw_ciudad,
   -- 2026-10-20 (D-UNI-06): el DANE de EDF es el centro poblado de 8 digitos
   -- (C6c); el municipio son sus 5 primeros. El INTEGER ya perdio el cero
@@ -364,7 +439,8 @@ SELECT
   COALESCE(cd.longitud, g.longitud) AS longitud
 FROM ( SELECT cd0.*,
               ROW_NUMBER() OVER (PARTITION BY cd0.cod_dw_ubic
-                                 ORDER BY cd0.cod_dw_persona_ubic) AS rn_ubic
+                                 ORDER BY cd0.cod_dw_persona_ubic) AS rn_ubic,
+              MAX(cd0.score_estandarizacion) OVER (PARTITION BY cd0.cod_dw_ubic) AS score_ubic
          FROM bdm_tempo.v_xpm_contacto_direccion cd0 ) cd
 LEFT JOIN (
   SELECT cod_dw_ubic, latitud, longitud

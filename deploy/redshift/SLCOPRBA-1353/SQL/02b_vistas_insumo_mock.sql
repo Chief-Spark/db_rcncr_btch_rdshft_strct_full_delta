@@ -163,6 +163,10 @@ SELECT
   ubi.texto_ubicacion AS texto_ubicacion_normalizado,
   ubi.texto_ubicacion AS texto_ubicacion_original,
   CAST(NULL AS DECIMAL(5,4)) AS score_estandarizacion,
+  -- 2026-10-20 (D-EDF-12): mismo nombre y tipo que la vista real. El mock no
+  -- trae score, asi que la gestion es NULL y cuenta como valida: el tablero
+  -- no se mueve.
+  CAST(NULL AS VARCHAR(20)) AS descripcion_gestion_registro,
   ubi.cod_dw_ciudad,
   ubi.cod_dw_ciudad AS cod_dw_municipio,
   ubi.departamento,
@@ -273,6 +277,7 @@ SELECT
   ubi.texto_ubicacion                        AS texto_ubicacion_normalizado,
   ubi.texto_ubicacion                        AS texto_ubicacion_original,
   CAST(NULL AS DECIMAL(5,4))                 AS score_estandarizacion,
+  CAST(NULL AS VARCHAR(20))                  AS descripcion_gestion_registro,
   ubi.cod_dw_ciudad,
   ubi.departamento,
   ubi.municipio,

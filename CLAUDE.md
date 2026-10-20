@@ -865,7 +865,7 @@ una divergencia disfrazada de criterio cumplido.
 | Que | Por que |
 |---|---|
 | El `MD5` no puede leer el alias `concatena` de su propio `SELECT` | el legado escribe `rec_vista.hash_md5(concatena)` referenciando la columna de al lado; Teradata lo resuelve y Redshift **no**. Misma trampa que `FLAG_OP` (`Novedad.sql:8392-8396`). El concatena va en subconsulta |
-| De las 12 columnas del concatena, 7 llevan dato y 5 el centinela `'0'` | se quedan **en su sitio y en su orden** para que el dia que el dato exista el hash cambie en una linea y se vea en el diff. Faltan gestion de registro, tipo de cuenta (Fase 2), barrio, departamento |
+| De las 12 columnas del concatena, 9 llevan dato y 3 el centinela `'0'` | se quedan **en su sitio y en su orden** para que el dia que el dato exista el hash cambie en una linea y se vea en el diff. **La gestion de registro entro el 2026-10-20** (score de estandarizacion, D-EDF-12; sin score sigue en `'0'` y el hash del mock no cambia). Faltan tipo de cuenta (Fase 2), barrio, departamento |
 | La llave del anti-join son CUATRO columnas; la de la entidad, TRES | `F3-07` nombra tres. El hash es la cuarta, la que decide si la COMBINACION es nueva. Confundirlas haria que una direccion cambiada no se registrara |
 
 **LOS ARQUETIPOS VAN EN PAREJA Y POR ESO SON DOS.** `ARQ 97` cambia de texto
