@@ -160,7 +160,7 @@ FROM (
          'Novedad.sql:8278; BLOQUEADO: no se entregaron V_ZONA_UBICACION ni V_Hom_Zona_Linea' UNION ALL
   SELECT 'NOV-UB-18', 'UBICACION', 'Media', 'CONSULTA',
          'La columna de tipo de identificacion debe traer la descripcion homologada.',
-         'Novedad.sql:8406; BLOQUEADO: no se entrego el catalogo V_Hom_Tip_Ident_Linea' UNION ALL
+         'Novedad.sql:8406; el catalogo V_Hom_Tip_Ident_Linea llego el 2026-10-21 (11 filas, bdm_datos.catalogo_hom_tipo_ident) y la columna ya se puebla' UNION ALL
   SELECT 'NOV-UB-19', 'UBICACION', 'Baja', 'CONSULTA',
          'La columna INDICATIVO debe traer el codigo de area del telefono fijo.',
          'Novedad.sql:7968; BLOQUEADO: no se entrego V_TELEFONO_FIJO' UNION ALL
@@ -220,7 +220,7 @@ FROM (
          'el legado las toma de V_ACTIVIDAD_ECONO_CIIU (Novedad.sql:1352-1354), catalogo que NO se entrego. Peticion en docs/PETICION_CATALOGOS_NOVEDADES.md seccion 6' UNION ALL
   SELECT 'NOV-AE-07', 'ACTIVIDAD_ECONOMICA', 'Media', 'CONSULTA',
          'La columna de tipo de identificacion debe traer la descripcion homologada.',
-         'mismo catalogo que bloquea NOV-UB-18: falta V_Hom_Tip_Ident_Linea' UNION ALL
+         'mismo catalogo que NOV-UB-18: V_Hom_Tip_Ident_Linea, que llego el 2026-10-21 y ya se consume' UNION ALL
   SELECT 'NOV-AE-08', 'ACTIVIDAD_ECONOMICA', 'Alta', 'CONSULTA',
          'El AS-IS de este dominio solo inserta: ninguna fila debe salir marcada como baja y la tabla final no debe perder filas.',
          'el DELETE del 130.TPT:753 exige Severidad=2 y el CASE de 120.TPT:186-197 no tiene rama que la devuelva: tres ramas dan 1 y el ELSE da -1. Mismo patron que el flag_op=E de Ubicacion' UNION ALL

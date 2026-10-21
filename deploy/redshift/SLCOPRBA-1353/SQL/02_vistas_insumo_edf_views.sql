@@ -758,8 +758,13 @@ SELECT
   -- catalogo de tipos y un personidtype de mas de 10 digitos aborta el cast
   -- (job #293).
   CAST(bid.personidtype AS VARCHAR(20))                           AS cod_tipo_ident_fte,
-  -- Falta V_Hom_Tip_Ident_Linea (C37). El codigo esta arriba.
-  CAST(NULL AS VARCHAR(100))                                      AS tipo_identificacion,
+  -- 2026-10-21: YA NO ES NULL. El catalogo V_Hom_Tip_Ident_Linea llego (11
+  -- filas, cargadas en bdm_datos.catalogo_hom_tipo_ident) y esta columna es
+  -- exactamente el join que el legado hace: h1.Descripcion_Hom_Tip_Ident_Linea
+  -- por Valor_Fuente = COD_TIPO_IDENT_FTE (Novedad.sql:3455, :3475-3476).
+  --   LEFT JOIN y no INNER: un tipo fuera del catalogo tiene que salir NULL y
+  --   no perder la persona, que es lo que hace el legado.
+  CAST(hti.descripcion AS VARCHAR(100))                           AS tipo_identificacion,
   CASE WHEN bid.personidnumber ~ '^[0-9]+$'
        THEN CAST(bid.personidnumber AS BIGINT)
        ELSE NULL
@@ -866,4 +871,8 @@ LEFT JOIN (
   WHERE q.rn = 1
 ) bid
   ON xpm.bestidentifications = bid.id
+-- El catalogo de homologacion del tipo de identificacion. Va al final porque
+-- depende de bid: une por el personidtype de la identificacion elegida.
+LEFT JOIN bdm_datos.catalogo_hom_tipo_ident hti
+  ON hti.valor_fuente = CAST(bid.personidtype AS VARCHAR(20))
 WITH NO SCHEMA BINDING;

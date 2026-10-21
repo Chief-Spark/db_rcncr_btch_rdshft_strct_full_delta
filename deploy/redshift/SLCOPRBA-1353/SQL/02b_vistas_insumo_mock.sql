@@ -409,8 +409,8 @@ SELECT
   CAST('NOMBRE'   || CAST(p.id_buro_persona AS VARCHAR(20))
        || ' APELLIDO' || CAST(p.id_buro_persona AS VARCHAR(20)) AS VARCHAR(200)) AS nombre_completo,
   p.cod_tipo_ident_fte,
-  -- Falta V_Hom_Tip_Ident_Linea (C37), igual que en el real.
-  CAST(NULL AS VARCHAR(100))                                  AS tipo_identificacion,
+  -- 2026-10-21: YA NO ES NULL, igual que en el real. El catalogo llego.
+  CAST(hti.descripcion AS VARCHAR(100))                       AS tipo_identificacion,
   p.cod_pin_persona                                           AS numero_identificacion,
   -- Dos estados, para que la columna no sea constante: 00 vigente y
   -- 21 cancelada por muerte, que son los dos que D-EDF-13 da por confirmados
@@ -462,4 +462,8 @@ FROM (
 ) p
 LEFT JOIN bdm_stage.ciiu_persona cp
   ON cp.id_buro_persona = p.id_buro_persona
+-- El catalogo es COMPARTIDO con la via real: es un catalogo de negocio, no
+-- una fuente de datos, y sembrarlo dos veces lo dejaria derivar.
+LEFT JOIN bdm_datos.catalogo_hom_tipo_ident hti
+  ON hti.valor_fuente = p.cod_tipo_ident_fte
 WITH NO SCHEMA BINDING;
