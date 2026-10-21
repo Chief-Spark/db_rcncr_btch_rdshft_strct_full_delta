@@ -282,7 +282,7 @@ SELECT
   CAST(fb.paidinstallments AS INTEGER)                                    AS num_cuotas_pagadas
 FROM ds_dba_rncr_batch.edf_views.xpm_bestaccounts ba
 INNER JOIN ds_dba_rncr_batch.edf_views.xpm xpm
-        ON xpm."bestaccounts" = ba.id
+        ON xpm.bestaccounts = ba.id
 LEFT JOIN (
   SELECT fb0.id,
          fb0."bestaccounts.val.frequentbehaviour.val.debtbalance"        AS debtbalance,
