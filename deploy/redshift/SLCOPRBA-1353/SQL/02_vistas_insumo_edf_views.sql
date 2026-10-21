@@ -698,3 +698,172 @@ FROM ds_dba_rncr_batch.edf_views.xpm xpm
 WHERE NULLIF(TRIM(xpm."bestpersonalinformation.mainisiccodeforproduct"::VARCHAR), '') IS NOT NULL
 WITH NO SCHEMA BINDING;
 
+
+-- ============================================================
+-- v_xpm_persona_basica (2026-10-21, dominio INFO BASICA / d4)
+-- LOS ATRIBUTOS DE LA PERSONA, uno por persona.
+--
+-- LEGADO: PRO_Novedad_Linea_Info_Basica (Novedad.sql:2166-3920), doce etapas.
+-- NO ES UN PORT DE ESAS DOCE ETAPAS Y CONVIENE NO ABRIRLO COMO SI LO FUERA.
+-- Su trabajo entero es elegir, por persona, el valor MAS CONFIABLE de una
+-- veintena de atributos: cada etapa arrastra un par de columnas (NOMBRE_1 y
+-- NOMBRE_1_2, GENERO y GENERO_2...) y la etapa 9_1 resuelve con
+-- COALESCE(valor_2, valor) (Novedad.sql:3447-3466). En EDF esa eleccion YA
+-- ESTA HECHA: las secciones bestName, bestIdentifications y
+-- bestPersonalInformation SON el registro mas confiable. Es la misma forma
+-- que la Fase 1 del Ordenamiento: no faltaba codigo de negocio, el
+-- equivalente ya existia.
+--
+-- EL GRANO ES UNA FILA POR PERSONA, y hay que forzarlo: una persona puede
+-- tener VARIAS identificaciones (CC y NIT, por ejemplo) y el join a
+-- xpm_bestidentifications multiplicaria. La llave de MAT_INFO_BASICA es ID
+-- sola -- STG.ID = B.ID en 120.TPT:261-262 --, asi que se elige UNA:
+--   1. la validada contra fuente oficial (officialSourceValidationStatus),
+--      que es la intencion del "registro mas confiable" del legado;
+--   2. a igualdad, el index mas bajo.
+-- DIVERGENCIA ANOTADA: el legado elige por su propia cascada de prioridad,
+-- que no tenemos. Una persona con dos documentos aporta aqui el validado y
+-- en Teradata el que su cascada prefiera; pueden no ser el mismo.
+--   El fan-out es el riesgo de siempre y ya se pago dos veces (la clase de
+--   ubicacion desde v_xpm_contacto_canal, x3; el suscriptor por persona,
+--   hasta x57). Por eso el ranking va en subconsulta y no en un join directo.
+--
+-- TRES COLUMNAS DEL CONTRATO NO SE PUEDEN POBLAR, y cada una por su motivo:
+--   tipo_identificacion  -> falta el catalogo V_Hom_Tip_Ident_Linea (C37).
+--                           El CODIGO si sale (cod_tipo_ident_fte); lo que
+--                           falta es la descripcion homologada.
+--   pagina_web           -> NO EXISTE EN EDF. No es que no la hayamos
+--                           buscado: la seccion contactInformations del
+--                           contrato Alpha tiene el campo WebSite marcado
+--                           "NO APLICA (NO EXISTE CAMPO EN ALPHA)"
+--                           (Confluence CCBR 251264543, 2026-10-21).
+--   mosaic_id            -> Mosaic queda fuera por decision legal (D-NOV-07).
+-- Las tres se exponen aqui como NULL casteado para que la vista declare el
+-- tipo y el SP no tenga que inventarlo.
+-- ============================================================
+CREATE OR REPLACE VIEW bdm_tempo.v_xpm_persona_basica AS
+SELECT
+  FNV_HASH(xpm.pin)                                               AS id_buro_persona,
+  CASE WHEN NULLIF(TRIM(xpm.pin::VARCHAR), '') ~ '^[0-9]+$'
+       THEN CAST(NULLIF(TRIM(xpm.pin::VARCHAR), '') AS BIGINT)
+       ELSE NULL
+  END                                                             AS cod_pin_persona,
+  NULLIF(TRIM(xpm."bestname.firstname"::VARCHAR), '')             AS primer_nombre,
+  NULLIF(TRIM(xpm."bestname.secondname"::VARCHAR), '')            AS segundo_nombre,
+  NULLIF(TRIM(xpm."bestname.firstlastname"::VARCHAR), '')         AS primer_apellido,
+  NULLIF(TRIM(xpm."bestname.secondlastname"::VARCHAR), '')        AS segundo_apellido,
+  NULLIF(TRIM(xpm."bestname.fullname"::VARCHAR), '')              AS nombre_completo,
+  -- VARCHAR(20) y NO INTEGER, por la misma razon que en
+  -- v_xpm_contacto_direccion: el legado lo usa como llave de join contra el
+  -- catalogo de tipos y un personidtype de mas de 10 digitos aborta el cast
+  -- (job #293).
+  CAST(bid.personidtype AS VARCHAR(20))                           AS cod_tipo_ident_fte,
+  -- Falta V_Hom_Tip_Ident_Linea (C37). El codigo esta arriba.
+  CAST(NULL AS VARCHAR(100))                                      AS tipo_identificacion,
+  CASE WHEN bid.personidnumber ~ '^[0-9]+$'
+       THEN CAST(bid.personidnumber AS BIGINT)
+       ELSE NULL
+  END                                                             AS numero_identificacion,
+  -- D-EDF-13: businessidstatus (el homologado, el que usan los productos) y
+  -- NO idstatus, con LPAD a dos digitos. CC: 00 vigente, 21 cancelada por
+  -- muerte. NIT: 01 matricula activa en la DIAN.
+  CASE WHEN NULLIF(TRIM(bid.businessidstatus), '') IS NULL THEN NULL
+       ELSE LPAD(TRIM(bid.businessidstatus), 2, '0')
+  END                                                             AS estado_documento,
+  NULLIF(TRIM(xpm."bestpersonalinformation.agerange"::VARCHAR), '') AS rango_edad,
+  NULLIF(TRIM(bid.issuingcityname), '')                           AS lugar_expedicion,
+  CASE WHEN NULLIF(TRIM(bid.issuedate::VARCHAR), '') ~ '^[0-9]+$'
+       THEN bdm_datos.convert_epoch_to_date(
+              CAST(NULLIF(TRIM(bid.issuedate::VARCHAR), '') AS BIGINT))
+       ELSE NULL
+  END                                                             AS fecha_expedicion,
+  -- D-EDF-14, DECISION DEL USUARIO 2026-10-21. Catalogo 93_GENDER_HO:
+  -- 0 desconocido, 1 masculino, 2 femenino, 3 no binario, 4 indefinido,
+  -- 9 no aplica. Se mapea 1 -> M, 2 -> F, 3 -> O y TODO lo demas (0, 4, 9 y
+  -- NULL) a vacio.
+  --   El 'O' es un valor NUEVO frente al AS-IS, que solo conocia M y F.
+  --   El 4 va a vacio aunque Collibra lo homologue a '-'.
+  --   VACIO Y NO NULL: el legado escribe COALESCE(GENERO_2, GENERO, '')
+  --   (Novedad.sql:3461), de modo que la ausencia es cadena vacia y no nulo.
+  --   Cambiarlo a NULL moveria la Severidad del 120.TPT, que compara con
+  --   COALESCE(..., 'SV').
+  --   COMPARADO COMO TEXTO, mismo idiom que typeofdata y que el booleano del
+  --   RUT: en el datashare gender es BIGINT y un = 1 vale, pero el stub del
+  --   banco lo declara VARCHAR y revienta con "operator does not exist:
+  --   character varying = integer". El cast es correcto en los dos.
+  CASE WHEN NULLIF(TRIM(xpm."bestpersonalinformation.gender"::VARCHAR), '') = '1' THEN CAST('M' AS VARCHAR(1))
+       WHEN NULLIF(TRIM(xpm."bestpersonalinformation.gender"::VARCHAR), '') = '2' THEN CAST('F' AS VARCHAR(1))
+       WHEN NULLIF(TRIM(xpm."bestpersonalinformation.gender"::VARCHAR), '') = '3' THEN CAST('O' AS VARCHAR(1))
+       ELSE CAST('' AS VARCHAR(1))
+  END                                                             AS genero,
+  NULLIF(TRIM(xpm."bestpersonalinformation.mainisiccodeforproduct"::VARCHAR), '') AS ciiu,
+  NULLIF(TRIM(xpm."bestpersonalinformation.productmainisicdescription"::VARCHAR), '') AS actividad_economica,
+  -- RAZON SOCIAL: el legado la trae de una columna propia de VU_PERSONA. En
+  -- EDF no hay campo aparte -- el nombre completo de una persona juridica ES
+  -- su razon social --, de modo que se deriva: fullname cuando el tipo de
+  -- documento es NIT (2) y NULL en otro caso. Es una DERIVACION nuestra y por
+  -- eso queda escrita; el riesgo es que un NIT con fullname vacio salga NULL
+  -- donde el legado traeria la razon social.
+  CASE WHEN CAST(bid.personidtype AS VARCHAR(20)) = '2'
+       THEN NULLIF(TRIM(xpm."bestname.fullname"::VARCHAR), '')
+       ELSE NULL
+  END                                                             AS razon_social,
+  -- NO EXISTE EN EDF: el campo WebSite del contrato Alpha esta marcado
+  -- "NO APLICA (NO EXISTE CAMPO EN ALPHA)" (Confluence CCBR 251264543).
+  CAST(NULL AS VARCHAR(200))                                      AS pagina_web,
+  -- Mosaic fuera por decision legal (D-NOV-07).
+  CAST(NULL AS INTEGER)                                           AS mosaic_id,
+  NULLIF(TRIM(bid.issuingstatename), '')                          AS departamento_expedicion,
+  -- RUT: el legado marca 'S' cuando la persona existe en VU_PERSONA con
+  -- COD_DW_FTE_DATO = 2 (Novedad.sql:3478-3483). En EDF el equivalente
+  -- declarado es el indicador de registro tributario del ciudadano.
+  --   EL BOOLEANO SE COMPARA COMO TEXTO, con el mismo idiom que el resto del
+  --   archivo (::VARCHAR + TRIM + NULLIF) y por el mismo motivo que
+  --   typeofdata mas arriba: en el datashare la columna es BOOLEAN y un
+  --   IS TRUE vale, pero el stub del banco la declara VARCHAR y revienta con
+  --   "argument of IS TRUE must be type boolean". En Redshift un BOOLEAN
+  --   casteado a VARCHAR da 'true' / 'false', de modo que la comparacion es
+  --   correcta en los dos y no cambia el resultado. Se aceptan tambien 't' y
+  --   '1' porque son las otras dos formas en que un booleano llega como
+  --   texto.
+  CASE WHEN LOWER(NULLIF(TRIM(xpm."bestpersonalinformation.citizentaxregistrationindicator"::VARCHAR), ''))
+            IN ('true', 't', '1')
+       THEN CAST('S' AS VARCHAR(1))
+       ELSE CAST('N' AS VARCHAR(1))
+  END                                                             AS rut
+FROM ds_dba_rncr_batch.edf_views.xpm xpm
+-- UNA identificacion por persona. El ranking va en subconsulta: un join
+-- directo a xpm_bestidentifications multiplica la fila de la persona por
+-- cuantos documentos tenga.
+LEFT JOIN (
+  SELECT q.id,
+         q.personidtype,
+         q.personidnumber,
+         q.businessidstatus,
+         q.issuingcityname,
+         q.issuingstatename,
+         q.issuedate
+  FROM (
+    SELECT b0.id,
+           b0."bestidentifications.val.personidtype"      AS personidtype,
+           NULLIF(TRIM(b0."bestidentifications.val.personidnumber"::VARCHAR), '')    AS personidnumber,
+           NULLIF(TRIM(b0."bestidentifications.val.businessidstatus"::VARCHAR), '')  AS businessidstatus,
+           NULLIF(TRIM(b0."bestidentifications.val.issuingcityname"::VARCHAR), '')   AS issuingcityname,
+           NULLIF(TRIM(b0."bestidentifications.val.issuingstatename"::VARCHAR), '')  AS issuingstatename,
+           b0."bestidentifications.val.issuedate"         AS issuedate,
+           ROW_NUMBER() OVER (
+             PARTITION BY b0.id
+             -- Mismo motivo que el booleano del RUT: comparado como texto
+             -- para que valga en el datashare y en el stub del banco.
+             ORDER BY CASE WHEN LOWER(NULLIF(TRIM(b0."bestidentifications.val.officialsourcevalidationstatus"::VARCHAR), ''))
+                                IN ('true', 't', '1')
+                           THEN 0 ELSE 1 END,
+                      b0."index"
+           ) AS rn
+    FROM ds_dba_rncr_batch.edf_views.xpm_bestidentifications b0
+    WHERE b0."index" IS NOT NULL
+  ) q
+  WHERE q.rn = 1
+) bid
+  ON xpm.bestidentifications = bid.id
+WITH NO SCHEMA BINDING;

@@ -367,3 +367,99 @@ SELECT
   CAST(fecha_corte AS DATE)    AS fecha_corte
 FROM bdm_stage.mock_comportamiento_cta
 WITH NO SCHEMA BINDING;
+
+-- ============================================================
+-- v_mock_persona_basica (2026-10-21, dominio INFO BASICA / d4)
+-- Espejo de v_xpm_persona_basica. MISMOS nombres y MISMOS tipos de columna,
+-- para que sp_novedades_info_basica_mock sea el real con las fuentes
+-- cambiadas y nada mas.
+--
+-- NO ES UNA SUSTITUCION DE TABLA: ES UNA DERIVACION, y conviene saber por
+-- que. El mock no siembra atributos de persona -- no hay una
+-- bdm_stage.persona_basica -- y sembrarla pedia tocar los tres
+-- seed_mock_matriz*, que es justo donde un cambio mueve los tableros. Lo que
+-- el mock tiene que probar aqui no son nombres realistas: es que el SP
+-- compile, que el grano sea UNA FILA POR PERSONA y que las cuatro ramas del
+-- genero se ejerciten. Eso se consigue derivando del id, que ademas lo hace
+-- DETERMINISTA: el mismo arquetipo da el mismo valor en toda corrida.
+--
+--   El id del mock es 9000000 + ARQ * 10000 + i, de modo que MOD(id, 4)
+--   reparte las cuatro ramas de D-EDF-14 por igual dentro de cada arquetipo:
+--   codigo 1 -> 'M', 2 -> 'F', 3 -> 'O' y 0 -> vacio. Sin esto el mock
+--   ejercitaria una sola rama y el mapeo que decidio el usuario quedaria sin
+--   probar.
+--
+-- LO QUE SI ES DATO SEMBRADO: el ciiu, que sale de bdm_stage.ciiu_persona,
+-- la misma semilla que leen v_mock_ciiu_persona y
+-- v_mock_actividad_economica_persona.
+--
+-- LAS TRES COLUMNAS BLOQUEADAS SALEN NULL IGUAL QUE EN EL REAL
+-- (tipo_identificacion por el catalogo C37, pagina_web porque no existe en
+-- EDF, mosaic_id por la decision legal). El mock no las inventa: si las
+-- rellenara, la bateria daria por probado algo que en real sale vacio.
+-- ============================================================
+CREATE OR REPLACE VIEW bdm_tempo.v_mock_persona_basica AS
+SELECT
+  p.id_buro_persona,
+  p.cod_pin_persona,
+  CAST('NOMBRE'   || CAST(p.id_buro_persona AS VARCHAR(20)) AS VARCHAR(100)) AS primer_nombre,
+  CAST('SEGUNDO'  || CAST(p.id_buro_persona AS VARCHAR(20)) AS VARCHAR(100)) AS segundo_nombre,
+  CAST('APELLIDO' || CAST(p.id_buro_persona AS VARCHAR(20)) AS VARCHAR(100)) AS primer_apellido,
+  CAST('SEGAPE'   || CAST(p.id_buro_persona AS VARCHAR(20)) AS VARCHAR(100)) AS segundo_apellido,
+  CAST('NOMBRE'   || CAST(p.id_buro_persona AS VARCHAR(20))
+       || ' APELLIDO' || CAST(p.id_buro_persona AS VARCHAR(20)) AS VARCHAR(200)) AS nombre_completo,
+  p.cod_tipo_ident_fte,
+  -- Falta V_Hom_Tip_Ident_Linea (C37), igual que en el real.
+  CAST(NULL AS VARCHAR(100))                                  AS tipo_identificacion,
+  p.cod_pin_persona                                           AS numero_identificacion,
+  -- Dos estados, para que la columna no sea constante: 00 vigente y
+  -- 21 cancelada por muerte, que son los dos que D-EDF-13 da por confirmados
+  -- para CC. LPAD igual que en el real.
+  LPAD(CASE WHEN MOD(p.id_buro_persona, 10) = 0 THEN '21' ELSE '0' END, 2, '0') AS estado_documento,
+  CAST('36-45' AS VARCHAR(20))                                AS rango_edad,
+  CAST('BOGOTA' AS VARCHAR(100))                              AS lugar_expedicion,
+  CAST('2010-05-20' AS DATE)                                  AS fecha_expedicion,
+  -- LA MISMA CASE DEL REAL, sobre un codigo derivado del id. Se repite la
+  -- expresion entera a proposito en vez de precalcular el valor: asi el
+  -- diff contra el real muestra que el mapeo es identico.
+  CASE WHEN MOD(p.id_buro_persona, 4) = 1 THEN CAST('M' AS VARCHAR(1))
+       WHEN MOD(p.id_buro_persona, 4) = 2 THEN CAST('F' AS VARCHAR(1))
+       WHEN MOD(p.id_buro_persona, 4) = 3 THEN CAST('O' AS VARCHAR(1))
+       ELSE CAST('' AS VARCHAR(1))
+  END                                                         AS genero,
+  cp.cod_act_econo_ciiu_fte                                   AS ciiu,
+  CAST(NULL AS VARCHAR(500))                                  AS actividad_economica,
+  CASE WHEN p.cod_tipo_ident_fte = '2'
+       THEN CAST('RAZON SOCIAL ' || CAST(p.id_buro_persona AS VARCHAR(20)) AS VARCHAR(200))
+       ELSE NULL
+  END                                                         AS razon_social,
+  -- No existe en EDF (Confluence CCBR 251264543), igual que en el real.
+  CAST(NULL AS VARCHAR(200))                                  AS pagina_web,
+  -- Mosaic fuera por decision legal (D-NOV-07), igual que en el real.
+  CAST(NULL AS INTEGER)                                       AS mosaic_id,
+  CAST('CUNDINAMARCA' AS VARCHAR(100))                        AS departamento_expedicion,
+  CASE WHEN MOD(p.id_buro_persona, 3) = 0 THEN CAST('S' AS VARCHAR(1))
+       ELSE CAST('N' AS VARCHAR(1))
+  END                                                         AS rut
+FROM (
+  -- UNA FILA POR PERSONA, Y VA CON GROUP BY -- NO CON SELECT DISTINCT.
+  -- La RPU mock tiene una fila por ubicacion, asi que hay que colapsar; el
+  -- primer intento fue un DISTINCT sobre las tres columnas y DEJO FAN-OUT:
+  -- 10.800 filas para 10.000 personas, medido en el banco. El motivo es que
+  -- en algunos arquetipos -- el 51 entre ellos -- unas filas de la RPU traen
+  -- cod_tipo_ident_fte con valor y otras en NULL, de modo que el DISTINCT las
+  -- ve como dos combinaciones distintas de la MISMA persona.
+  --   Se agrega por id_buro_persona con MAX() en las otras dos, y MAX() y no
+  --   MIN() a proposito: MAX ignora los NULL, de modo que recupera el valor
+  --   cuando existe en alguna fila en vez de propagar el nulo.
+  -- La llave de mat_info_basica es ID SOLA, asi que una persona con dos filas
+  -- no es una diferencia de matiz: son dos filas pisandose en la tabla final.
+  SELECT rpu.id_buro_persona,
+         MAX(rpu.cod_pin_persona)    AS cod_pin_persona,
+         MAX(rpu.cod_tipo_ident_fte) AS cod_tipo_ident_fte
+  FROM bdm_tempo.v_mock_relacion_persona_ubicacion rpu
+  GROUP BY rpu.id_buro_persona
+) p
+LEFT JOIN bdm_stage.ciiu_persona cp
+  ON cp.id_buro_persona = p.id_buro_persona
+WITH NO SCHEMA BINDING;

@@ -1,0 +1,13 @@
+-- ============================================================
+-- 37_rollback_ddl_nov_info_basica.sql
+-- Reverso exacto de 37_ddl_nov_info_basica.sql.
+-- UTF-8 sin BOM, sin acentos.
+--
+-- Una sola tabla: este dominio no pina ninguna etapa, porque en EDF la
+-- eleccion del registro mas confiable ya viene hecha y no hay cascada que
+-- traspasar al cargador.
+--
+-- NO se tocan los esquemas: bdm_datos es compartido y un
+-- DROP SCHEMA ... CASCADE desde strct es el incidente DEV #256.
+-- ============================================================
+DROP TABLE IF EXISTS bdm_datos.mat_info_basica;
