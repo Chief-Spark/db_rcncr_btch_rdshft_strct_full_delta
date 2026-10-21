@@ -1,0 +1,12 @@
+-- ============================================================
+-- 36_rollback_ddl_nov_contactabilidad.sql
+-- Reverso exacto de 36_ddl_nov_contactabilidad.sql.
+-- UTF-8 sin BOM, sin acentos.
+--
+-- Una sola tabla: este dominio no pina ninguna etapa -- no hay cascada que
+-- traspasar al cargador --, de modo que no hay mas DDL que revertir.
+--
+-- NO se tocan los esquemas: bdm_datos es compartido y un
+-- DROP SCHEMA ... CASCADE desde strct es el incidente DEV #256.
+-- ============================================================
+DROP TABLE IF EXISTS bdm_datos.mat_info_contactabilidad;
