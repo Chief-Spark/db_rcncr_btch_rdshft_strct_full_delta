@@ -242,7 +242,13 @@ SELECT
   cod_dw_persona_ubic,
   id_buro_suscriptor,
   cod_suscriptor,
-  fecha_reporte
+  fecha_reporte,
+  -- 2026-10-21 (T5): la columna existe para que el espejo declare el mismo
+  -- contrato que v_xpm_reporte_relacion_persona_ubica, y vale 'CAM' FIJO a
+  -- proposito: el mock no siembra typeOfData, y un valor constante deja el
+  -- grano de la etapa 2 como estaba. El tablero no se mueve, que es la
+  -- condicion con la que se aprobo T5.
+  CAST('CAM' AS VARCHAR(30)) AS fuente
 FROM bdm_stage.reporte_relacion_persona_ubica
 WITH NO SCHEMA BINDING;
 

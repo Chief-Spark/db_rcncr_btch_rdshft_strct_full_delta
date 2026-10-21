@@ -548,7 +548,28 @@ SELECT
       CAST(NULLIF(TRIM(loc."location.val.cutoffdate"::VARCHAR), '') AS BIGINT)
     )
     ELSE CURRENT_DATE
-  END AS fecha_reporte
+  END AS fecha_reporte,
+  -- 2026-10-21 (T5, D-NOV-03): LA FUENTE DEL REPORTE.
+  -- El legado la saca de V_FUENTE por Cod_DW_Fuente y cae a 'CAM' cuando no
+  -- hay coincidencia (Novedad.sql:8635). No tenemos V_FUENTE ni cod_dw_fuente
+  -- en el datashare, de modo que se deriva del typeOfData, que es el campo que
+  -- SI dice de donde viene el reporte (catalogo 170, RESULTADOS seccion 18):
+  -- los tipos de suscriptor (1, 2, 3 y 17) son SUS y el resto CAM.
+  --   DECISION DEL USUARIO, 2026-10-21. Es una DIVERGENCIA de origen, no de
+  --   valor: el legado decide por catalogo y nosotros por tipo de dato.
+  -- QUE CAMBIA AGUAS ABAJO: la etapa 2 de Novedades agrupa por fuente
+  -- (Novedad.sql:8670, GROUP BY 1..11), asi que con un literal constante el
+  -- grano colapsaba. Con esto vuelve a ser UNA FILA POR RPU Y FUENTE, que es
+  -- el grano del legado.
+  --   SE COMPARA COMO TEXTO, con el mismo idiom que el resto del archivo
+  --   (::VARCHAR + TRIM + NULLIF). En el datashare la columna es BIGINT y un
+  --   IN (1, 2, 3, 17) vale, pero el stub del banco la declara VARCHAR y
+  --   revienta con "operator does not exist: character varying = integer".
+  --   El cast explicito es correcto en los dos y no cambia el resultado.
+  CASE WHEN NULLIF(TRIM(loc."location.val.typeofdata"::VARCHAR), '') IN ('1', '2', '3', '17')
+       THEN CAST('SUS' AS VARCHAR(30))
+       ELSE CAST('CAM' AS VARCHAR(30))
+  END AS fuente
 FROM ds_dba_rncr_batch.edf_views.xpm xpm
 INNER JOIN ds_dba_rncr_batch.edf_views.xpm_location loc
   ON xpm.location = loc.id
