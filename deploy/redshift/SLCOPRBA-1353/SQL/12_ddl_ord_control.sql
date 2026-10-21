@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS bdm_datos.ord_control (
   fecha_hora_fin       TIMESTAMP,
   usuario_bd           VARCHAR(100),
   -- G-06 (D-ORD-12, 2026-10-21): cada corrida registra QUE VERSION DE BETAS
-  -- uso. Lo escribe ord_control_abrir leyendo bdm_datos.beta_ordenamiento, de
+  -- uso. Lo escribe sp_rcn_ctl_ord_abrir leyendo bdm_datos.beta_ordenamiento, de
   -- modo que el valor sale del dato cargado y no de un literal del SP.
   version_betas        VARCHAR(40)
 )
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS bdm_stage.mock_ord_control (
   fecha_hora_fin       TIMESTAMP,
   usuario_bd           VARCHAR(100),
   -- G-06 (D-ORD-12, 2026-10-21): cada corrida registra QUE VERSION DE BETAS
-  -- uso. Lo escribe ord_control_abrir leyendo bdm_datos.beta_ordenamiento, de
+  -- uso. Lo escribe sp_rcn_ctl_ord_abrir leyendo bdm_datos.beta_ordenamiento, de
   -- modo que el valor sale del dato cargado y no de un literal del SP.
   version_betas        VARCHAR(40)
 )
