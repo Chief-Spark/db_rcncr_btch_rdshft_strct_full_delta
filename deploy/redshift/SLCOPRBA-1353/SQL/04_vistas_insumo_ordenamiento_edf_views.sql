@@ -5,9 +5,32 @@
 -- ============================================================
 
 -- Salida ordenamiento: solo prioridad por RPU (no copiar universo XPM)
+-- EL RANKING ES POR CANAL (D-ORD-10, 2026-10-21). La columna canal entro con
+-- esa correccion y cambia el GRANO de la tabla: antes era una fila por RPU con
+-- el MIN(lugar) MEZCLANDO canales, y ahora es una fila por RPU Y CANAL con el
+-- lugar DENTRO de su canal.
+--
+-- POR QUE: el legado ordena cada canal por separado (Caracteristicas.txt:72
+-- EMA, :79 CEL, :88 DIR, :105 TEL) y alli una fila de DIRECCIONES_TEMP
+-- pertenece a UN canal, de modo que "lugar por canal" y "un valor por RPU" son
+-- lo mismo. En nuestro modelo no: v_xpm_contacto_canal ata cada canal a la
+-- direccion de su reporte, asi que un mismo cod_dw_persona_ubic aparece en
+-- varios canales y el MIN los fundia. El Batch entrega UN CUBO POR CANAL
+-- (Sps_Batch.sql:5416-5796) y cada uno necesita el lugar de SU canal.
+--
+-- LOS CONSUMIDORES DE HOY NO CAMBIAN DE VALOR: los tres que la leen agregan
+-- con MIN(orden_prioridad) GROUP BY cod_dw_persona_ubic -- la vista de abajo,
+-- sp_novedades_ubicacion_*.sql:123 y el evaluador --, de modo que siguen
+-- obteniendo el mismo numero que antes. Lo que gana el Batch es poder pedir el
+-- lugar de un canal concreto.
+--
+-- CREATE TABLE IF NOT EXISTS NO ANADE LA COLUMNA a una tabla que ya existe:
+-- de eso se encarga sp_rcn_ctl_ord_migrar_canal, que la anade una sola vez y
+-- vacia la tabla (la corrida siguiente es FULL y la repuebla).
 CREATE TABLE IF NOT EXISTS bdm_datos.rpu_orden_prioridad (
   cod_dw_persona_ubic  BIGINT  ENCODE AZ64,
   id_buro_persona      BIGINT  ENCODE AZ64,
+  canal                VARCHAR(3) ENCODE ZSTD,
   orden_prioridad      INTEGER ENCODE AZ64,
   fecha_actualizacion  TIMESTAMP DEFAULT GETDATE()
 )
