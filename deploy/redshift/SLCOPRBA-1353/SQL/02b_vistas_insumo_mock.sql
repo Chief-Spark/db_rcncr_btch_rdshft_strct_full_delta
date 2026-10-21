@@ -252,6 +252,18 @@ SELECT
 FROM bdm_stage.reporte_relacion_persona_ubica
 WITH NO SCHEMA BINDING;
 
+-- Espejo de v_xpm_actividad_economica_persona (D-NOV-06). Lee la MISMA
+-- semilla que v_mock_ciiu_persona a proposito: el mock siembra una actividad
+-- por persona y no tiene segundarias ni camara de comercio, de modo que el
+-- universo mock no cambia y el tablero no se mueve. El dia que se siembre un
+-- arquetipo con varias actividades, esta vista es la que hay que ensanchar.
+CREATE OR REPLACE VIEW bdm_tempo.v_mock_actividad_economica_persona AS
+SELECT
+  id_buro_persona,
+  cod_act_econo_ciiu_fte
+FROM bdm_stage.ciiu_persona
+WITH NO SCHEMA BINDING;
+
 CREATE OR REPLACE VIEW bdm_tempo.v_mock_ciiu_persona AS
 SELECT
   id_buro_persona,

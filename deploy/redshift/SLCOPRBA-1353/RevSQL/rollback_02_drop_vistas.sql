@@ -1,4 +1,6 @@
 -- Rollback vistas insumo edf_views
+DROP VIEW IF EXISTS bdm_tempo.v_xpm_actividad_economica_persona;
+DROP VIEW IF EXISTS bdm_tempo.v_mock_actividad_economica_persona;
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_ciiu_persona;
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_reporte_relacion_persona_ubica;
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_direccion_fisica;

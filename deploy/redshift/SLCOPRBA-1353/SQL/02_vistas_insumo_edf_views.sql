@@ -5,6 +5,7 @@
 -- Sanitiza strings vacios / IDs fuera de rango INTEGER (edf_views DEV)
 -- ============================================================
 
+DROP VIEW IF EXISTS bdm_tempo.v_xpm_actividad_economica_persona;
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_ciiu_persona;
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_reporte_relacion_persona_ubica;
 DROP VIEW IF EXISTS bdm_tempo.v_xpm_direccion_fisica;
@@ -585,6 +586,110 @@ LEFT JOIN ( SELECT c0.id,
 WHERE NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') IN ('1', '2', '3', '7', '8')
 WITH NO SCHEMA BINDING;
 
+-- ============================================================
+-- v_xpm_actividad_economica_persona (2026-10-21, D-NOV-06)
+-- EL UNIVERSO COMPLETO DE ACTIVIDADES ECONOMICAS DE LA PERSONA.
+--
+-- El legado lee VU_PERSONA_ACTIVIDAD_ECONOMICA, que tiene una fila POR
+-- PERSONA Y POR COD_DW_ACT_ECONO_CIIU (Novedad.sql:1280-1294,
+-- PRIMARY INDEX(INFO_BASICA_ID, COD_DW_ACT_ECONO_CIIU)). Nosotros
+-- entregabamos SOLO el CIIU principal, que es una de las once fuentes.
+--
+-- ES UNA VISTA NUEVA Y NO UNA AMPLIACION DE v_xpm_ciiu_persona, Y ESO NO ES
+-- UN CAPRICHO: sp_unificacion_r1_preparar_insumo.sql:87 une esa vista a la
+-- RPU por id_buro_persona con un LEFT JOIN, y hoy puede hacerlo porque tiene
+-- UNA fila por persona. Devolver alli todas las actividades MULTIPLICARIA el
+-- insumo de la Regla 1 por el numero de actividades de cada persona, que es
+-- el mismo fan-out que ya se pago dos veces -- v_xpm_contacto_canal por tres
+-- y stg_ord_alcance_origen -- y esta vez caeria sobre Unificacion, que ya
+-- esta desplegada y certificada. v_xpm_ciiu_persona se queda EXACTAMENTE
+-- como estaba, con el CIIU principal, que es lo que la Regla 1 necesita.
+--
+-- LAS ONCE FUENTES, todas del mismo grano persona -> actividad:
+--   1  xpm.bestpersonalinformation.mainisiccodeforproduct  (la que ya habia)
+--   2  personalinformation.val.mainisiccode
+--   3-6 personalinformation.val.secondaryisiccode.secondaryisiccode1..4
+--   7  chamberofcommerce...detailofmercantileregistrations.mainisiccodeforproduct
+--   8-11 chamberofcommerce...secondaryisiccode1..4
+--
+-- El DISTINCT de la cabecera es el que impide que una persona que repite la
+-- misma actividad en dos fuentes la reciba dos veces: el legado tiene esa
+-- unicidad por indice primario.
+-- ============================================================
+CREATE OR REPLACE VIEW bdm_tempo.v_xpm_actividad_economica_persona AS
+SELECT DISTINCT id_buro_persona, cod_act_econo_ciiu_fte
+FROM (
+  SELECT FNV_HASH(xpm.pin) AS id_buro_persona,
+         CAST(NULLIF(TRIM(xpm."bestpersonalinformation.mainisiccodeforproduct"::VARCHAR), '') AS VARCHAR(20)) AS cod_act_econo_ciiu_fte
+  FROM ds_dba_rncr_batch.edf_views.xpm xpm
+  UNION ALL
+  SELECT FNV_HASH(xpm.pin),
+         CAST(NULLIF(TRIM(pi."personalinformation.val.mainisiccode"::VARCHAR), '') AS VARCHAR(20))
+  FROM ds_dba_rncr_batch.edf_views.xpm xpm
+  INNER JOIN ds_dba_rncr_batch.edf_views.xpm_personalinformation pi
+          ON pi.id = xpm.personalinformation AND pi."index" IS NOT NULL
+  UNION ALL
+  SELECT FNV_HASH(xpm.pin),
+         CAST(NULLIF(TRIM(pi."personalinformation.val.secondaryisiccode.secondaryisiccode1"::VARCHAR), '') AS VARCHAR(20))
+  FROM ds_dba_rncr_batch.edf_views.xpm xpm
+  INNER JOIN ds_dba_rncr_batch.edf_views.xpm_personalinformation pi
+          ON pi.id = xpm.personalinformation AND pi."index" IS NOT NULL
+  UNION ALL
+  SELECT FNV_HASH(xpm.pin),
+         CAST(NULLIF(TRIM(pi."personalinformation.val.secondaryisiccode.secondaryisiccode2"::VARCHAR), '') AS VARCHAR(20))
+  FROM ds_dba_rncr_batch.edf_views.xpm xpm
+  INNER JOIN ds_dba_rncr_batch.edf_views.xpm_personalinformation pi
+          ON pi.id = xpm.personalinformation AND pi."index" IS NOT NULL
+  UNION ALL
+  SELECT FNV_HASH(xpm.pin),
+         CAST(NULLIF(TRIM(pi."personalinformation.val.secondaryisiccode.secondaryisiccode3"::VARCHAR), '') AS VARCHAR(20))
+  FROM ds_dba_rncr_batch.edf_views.xpm xpm
+  INNER JOIN ds_dba_rncr_batch.edf_views.xpm_personalinformation pi
+          ON pi.id = xpm.personalinformation AND pi."index" IS NOT NULL
+  UNION ALL
+  SELECT FNV_HASH(xpm.pin),
+         CAST(NULLIF(TRIM(pi."personalinformation.val.secondaryisiccode.secondaryisiccode4"::VARCHAR), '') AS VARCHAR(20))
+  FROM ds_dba_rncr_batch.edf_views.xpm xpm
+  INNER JOIN ds_dba_rncr_batch.edf_views.xpm_personalinformation pi
+          ON pi.id = xpm.personalinformation AND pi."index" IS NOT NULL
+  UNION ALL
+  SELECT FNV_HASH(xpm.pin),
+         CAST(NULLIF(TRIM(cc."chamberofcommerce.val.detailofmercantileregistrations.mainisiccodeforproduct"::VARCHAR), '') AS VARCHAR(20))
+  FROM ds_dba_rncr_batch.edf_views.xpm xpm
+  INNER JOIN ds_dba_rncr_batch.edf_views.xpm_chamberofcommerce cc
+          ON cc.id = xpm.chamberofcommerce AND cc."index" IS NOT NULL
+  UNION ALL
+  SELECT FNV_HASH(xpm.pin),
+         CAST(NULLIF(TRIM(cc."chamberofcommerce.val.detailofmercantileregistrations.secondaryisiccode1"::VARCHAR), '') AS VARCHAR(20))
+  FROM ds_dba_rncr_batch.edf_views.xpm xpm
+  INNER JOIN ds_dba_rncr_batch.edf_views.xpm_chamberofcommerce cc
+          ON cc.id = xpm.chamberofcommerce AND cc."index" IS NOT NULL
+  UNION ALL
+  SELECT FNV_HASH(xpm.pin),
+         CAST(NULLIF(TRIM(cc."chamberofcommerce.val.detailofmercantileregistrations.secondaryisiccode2"::VARCHAR), '') AS VARCHAR(20))
+  FROM ds_dba_rncr_batch.edf_views.xpm xpm
+  INNER JOIN ds_dba_rncr_batch.edf_views.xpm_chamberofcommerce cc
+          ON cc.id = xpm.chamberofcommerce AND cc."index" IS NOT NULL
+  UNION ALL
+  SELECT FNV_HASH(xpm.pin),
+         CAST(NULLIF(TRIM(cc."chamberofcommerce.val.detailofmercantileregistrations.secondaryisiccode3"::VARCHAR), '') AS VARCHAR(20))
+  FROM ds_dba_rncr_batch.edf_views.xpm xpm
+  INNER JOIN ds_dba_rncr_batch.edf_views.xpm_chamberofcommerce cc
+          ON cc.id = xpm.chamberofcommerce AND cc."index" IS NOT NULL
+  UNION ALL
+  SELECT FNV_HASH(xpm.pin),
+         CAST(NULLIF(TRIM(cc."chamberofcommerce.val.detailofmercantileregistrations.secondaryisiccode4"::VARCHAR), '') AS VARCHAR(20))
+  FROM ds_dba_rncr_batch.edf_views.xpm xpm
+  INNER JOIN ds_dba_rncr_batch.edf_views.xpm_chamberofcommerce cc
+          ON cc.id = xpm.chamberofcommerce AND cc."index" IS NOT NULL
+) u
+WHERE cod_act_econo_ciiu_fte IS NOT NULL
+WITH NO SCHEMA BINDING;
+
+-- v_xpm_ciiu_persona: SOLO el CIIU principal, UNA fila por persona. NO se
+-- amplia: la lee sp_unificacion_r1_preparar_insumo.sql:87 con un LEFT JOIN
+-- por persona y mas de una fila multiplicaria el insumo de la Regla 1. El
+-- universo completo vive en v_xpm_actividad_economica_persona, aqui arriba.
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_ciiu_persona AS
 SELECT DISTINCT
   FNV_HASH(xpm.pin) AS id_buro_persona,
