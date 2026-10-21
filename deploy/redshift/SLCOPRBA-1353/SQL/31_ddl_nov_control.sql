@@ -91,7 +91,7 @@ SORTKEY (corrida_id);
 CREATE TABLE IF NOT EXISTS bdm_datos.nov_control_etapa (
   corrida_id                  BIGINT       NOT NULL,   -- FK logico a nov_control.corrida_id
   lote                        INTEGER      NOT NULL,
-  etapa                       VARCHAR(20)  NOT NULL,   -- ver la lista de dominios de arriba
+  etapa                       VARCHAR(64)  NOT NULL,   -- ver la lista de dominios de arriba
   estado                      VARCHAR(12)  NOT NULL,   -- en proceso | completado | fallido
   fecha_hora_inicio           TIMESTAMP    NOT NULL,
   fecha_hora_fin              TIMESTAMP,

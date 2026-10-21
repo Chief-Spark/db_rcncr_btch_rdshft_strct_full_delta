@@ -62,7 +62,7 @@ SORTKEY (corrida_id);
 CREATE TABLE IF NOT EXISTS bdm_datos.unif_control_etapa (
   corrida_id                  BIGINT       NOT NULL,   -- FK logico a unif_control.corrida_id
   lote                        INTEGER      NOT NULL,   -- Lote_Corrida (Req 13.1)
-  etapa                       VARCHAR(20)  NOT NULL,   -- regla1 | regla2 | regla2_escN | geo | regla3 (Req 13.2, 13.3)
+  etapa                       VARCHAR(64)  NOT NULL,   -- regla1 | regla2 | regla2_escN | geo | regla3 (Req 13.2, 13.3)
   estado                      VARCHAR(12)  NOT NULL,   -- en proceso | completado | fallido (Req 13.2)
   fecha_hora_inicio           TIMESTAMP    NOT NULL,
   fecha_hora_fin              TIMESTAMP,

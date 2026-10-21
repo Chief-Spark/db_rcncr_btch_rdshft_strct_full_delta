@@ -41,6 +41,10 @@ SORTKEY (ambiente, parametro);
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS bdm_datos.geo_lote_control (
   lote                 INTEGER      NOT NULL,
+  -- corrida_id (2026-10-21, observabilidad F3): ata el Lote GEO a la corrida
+  -- de Unificacion que lo creo. Sin el, un Lote fallido no se puede cruzar
+  -- con la traza de la corrida que lo produjo.
+  corrida_id           BIGINT,
   estado               VARCHAR(40)  NOT NULL,  -- exportado | procesado por ArcGIS_Externo | cargado | fallido | fallido definitivo | vencido
   fase_fallo           VARCHAR(40),            -- exportacion | georreferenciacion | distancias | reenganche_r3
   conteo_esperado      INTEGER,

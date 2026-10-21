@@ -3,10 +3,16 @@
 -- id_buro_persona BIGINT (FNV_HASH real)
 -- ============================================================
 
+-- version_betas (2026-10-21, G-06 / D-ORD-12): QUE JUEGO DE BETAS ES ESTE.
+-- Vive CON el dato y no en el procedimiento a proposito: el dia que un RITM
+-- nuevo reemplace los coeficientes, cambia el archivo de carga y la corrida
+-- registra el valor nuevo sin tocar codigo. Si estuviera escrito en el SP,
+-- registraria lo que alguien recordo poner, no lo que se cargo.
 CREATE TABLE IF NOT EXISTS bdm_datos.beta_ordenamiento (
   canal              VARCHAR(10)    ENCODE ZSTD,
   cod_caracteristica VARCHAR(20)    ENCODE ZSTD,
-  valor_beta         DECIMAL(18,8)  ENCODE AZ64
+  valor_beta         DECIMAL(18,8)  ENCODE AZ64,
+  version_betas      VARCHAR(40)    ENCODE ZSTD
 )
 DISTSTYLE ALL;
 

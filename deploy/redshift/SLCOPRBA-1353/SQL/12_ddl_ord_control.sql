@@ -20,7 +20,11 @@ CREATE TABLE IF NOT EXISTS bdm_datos.ord_control (
   scores_generados     BIGINT,
   fecha_hora_inicio    TIMESTAMP    NOT NULL,
   fecha_hora_fin       TIMESTAMP,
-  usuario_bd           VARCHAR(100)
+  usuario_bd           VARCHAR(100),
+  -- G-06 (D-ORD-12, 2026-10-21): cada corrida registra QUE VERSION DE BETAS
+  -- uso. Lo escribe ord_control_abrir leyendo bdm_datos.beta_ordenamiento, de
+  -- modo que el valor sale del dato cargado y no de un literal del SP.
+  version_betas        VARCHAR(40)
 )
 DISTSTYLE ALL
 SORTKEY (corrida_id);
@@ -28,7 +32,7 @@ SORTKEY (corrida_id);
 CREATE TABLE IF NOT EXISTS bdm_datos.ord_control_etapa (
   corrida_id           BIGINT       NOT NULL,
   lote                 INTEGER      NOT NULL,
-  etapa                VARCHAR(30)  NOT NULL,
+  etapa                VARCHAR(64)  NOT NULL,   -- 64 desde 2026-10-21: los nombres de etapa de Novedades y de la R2 no cabian en 30
   estado               VARCHAR(12)  NOT NULL,
   fecha_hora_inicio    TIMESTAMP    NOT NULL,
   fecha_hora_fin       TIMESTAMP,
@@ -55,7 +59,11 @@ CREATE TABLE IF NOT EXISTS bdm_stage.mock_ord_control (
   scores_generados     BIGINT,
   fecha_hora_inicio    TIMESTAMP    NOT NULL,
   fecha_hora_fin       TIMESTAMP,
-  usuario_bd           VARCHAR(100)
+  usuario_bd           VARCHAR(100),
+  -- G-06 (D-ORD-12, 2026-10-21): cada corrida registra QUE VERSION DE BETAS
+  -- uso. Lo escribe ord_control_abrir leyendo bdm_datos.beta_ordenamiento, de
+  -- modo que el valor sale del dato cargado y no de un literal del SP.
+  version_betas        VARCHAR(40)
 )
 DISTSTYLE ALL
 SORTKEY (corrida_id);
@@ -63,7 +71,7 @@ SORTKEY (corrida_id);
 CREATE TABLE IF NOT EXISTS bdm_stage.mock_ord_control_etapa (
   corrida_id           BIGINT       NOT NULL,
   lote                 INTEGER      NOT NULL,
-  etapa                VARCHAR(30)  NOT NULL,
+  etapa                VARCHAR(64)  NOT NULL,   -- 64 desde 2026-10-21: los nombres de etapa de Novedades y de la R2 no cabian en 30
   estado               VARCHAR(12)  NOT NULL,
   fecha_hora_inicio    TIMESTAMP    NOT NULL,
   fecha_hora_fin       TIMESTAMP,
