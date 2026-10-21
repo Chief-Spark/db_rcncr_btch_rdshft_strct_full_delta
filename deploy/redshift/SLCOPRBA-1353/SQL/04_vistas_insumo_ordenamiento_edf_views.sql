@@ -198,61 +198,132 @@ WITH NO SCHEMA BINDING;
 
 
 -- ============================================================
--- SLCOPRBA-1355 -- v_xpm_cuenta: EL CONTRATO DE LA FASE 2, SIN FUENTE TODAVIA
+-- v_xpm_cuenta: EL CONTRATO DE LA FASE 2, YA CON FUENTE (2026-10-21)
 --
--- LEER ESTO ANTES DE "ARREGLARLA": LA VISTA DEVUELVE CERO FILAS A PROPOSITO.
---
--- La Fase 2 necesita las nueve columnas del clasificador Portafolio
--- (PRO_ORD_CTA_TOTALES_PERSONAS_2.sql:304-375). El candidato del datashare es
--- edf_views.xpm_bestaccounts (~80 columnas), y sobre el hay una decision ya
--- tomada y escrita en docs/MAPEO_DESBLOQUEO_DATASHARE_ORDENAMIENTO.md:184-188:
+-- ESTA VISTA DEVOLVIA CERO FILAS A PROPOSITO Y YA NO. La cabecera anterior
+-- decia que la fuente quedaba pendiente "el dia que la llave se verifique",
+-- citando docs/MAPEO_DESBLOQUEO_DATASHARE_ORDENAMIENTO.md:184-188:
 --
 --   "Lo que no se hace: escribir nada sobre xpm_bestaccounts todavia. Su
---    relacion con xpm_location por accountnumber esta sin verificar, y el
---    legado advierte que la llave natural de una cuenta no es
---    (accountnumber, accounttype) sino al menos
---    (Num_Cta, Cod_Tipo_Cta_Fte, Id_Buro_Suscriptor)."
+--    relacion con xpm_location por accountnumber esta sin verificar..."
 --
--- Adivinar ese mapeo para que el SP "tenga de donde leer" seria justo lo que
--- esa decision prohibe, y una llave mal elegida colapsaria cuentas igual que
--- el (id, index) colapsa contactos en Unificacion.
+-- ESA CONDICION ESTA CUMPLIDA. Medido contra el productor (C33b, C38 y C39,
+-- RESULTADOS seccion 19.1 y D-EDF-15):
+--   * el contenedor bestaccounts es 1:1 con la persona -- 98.586 de 98.586
+--     tienen exactamente UNA --, de modo que no colapsa cuentas de personas
+--     distintas, que era el riesgo que esa decision protegia;
+--   * la llave de seis partes (contenedor mas los cinco campos de Data
+--     Provisioning) casa sin un solo falso positivo;
+--   * unir solo por numero de cuenta SI es falso: 5.802 pares contra 278, y
+--     el 95 % son de otra cuenta de la misma persona. Por eso aqui no se
+--     afloja la llave.
 --
--- ASI QUE SE DECLARA EL CONTRATO Y SE DEJA LA FUENTE PENDIENTE. Cero filas
--- hace que la via REAL de la Fase 2 no produzca nada -- que es exactamente lo
--- cierto hoy -- en vez de reventar al primer CALL, y mantiene la paridad con
--- el espejo mock, que SI tiene datos. El dia que la llave se verifique, se
--- cambia el FROM de esta vista y no se toca ni una linea de los dos SP.
+-- LO QUE HOY NO TRAE DATO NO ES LA LLAVE, ES EL ORIGEN: solo 146 de 98.586
+-- personas tienen alguna cuenta en DEV y QA (7.759 filas en 146
+-- contenedores). La vista queda CABLEADA para que el dia que Experian pueble
+-- bestaccounts -- demo y produccion -- la Fase 2 real funcione sin tocar
+-- codigo. Decision del usuario, 2026-10-21: no es bloqueante.
 --
+-- DOS COLUMNAS SE QUEDAN EN NULL Y ESTA ESCRITO DONDE: cod_tipo_obligacion_fte
+-- y numero_dias_mora. Las dos tienen mas de un candidato en el datashare y
+-- las dos entran en el clasificador Portafolio, que decide el Sector y el
+-- Sector entra en el score. Elegir mal seria una divergencia disfrazada de
+-- dato. Se preguntan antes de cablearlas.
+--
+-- El mock NO pasa por aqui: lee bdm_stage.mock_cuenta por su propio espejo,
+-- de modo que el tablero no se mueve.
 -- WITH NO SCHEMA BINDING como todas las de este archivo.
 -- ============================================================
 
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_cuenta AS
 SELECT
-  CAST(NULL AS BIGINT)        AS cod_dw_cta,
-  CAST(NULL AS BIGINT)        AS id_buro_persona,
-  CAST(NULL AS BIGINT)        AS cod_pin_persona,
-  CAST(NULL AS CHAR(6))       AS cod_suscriptor,
-  CAST(NULL AS VARCHAR(10))   AS cod_tipo_cta_fte,
-  CAST(NULL AS VARCHAR(10))   AS cod_tipo_obligacion_fte,
-  CAST(NULL AS VARCHAR(10))   AS cod_tipo_rel_con_cta_fte,
-  CAST(NULL AS VARCHAR(10))   AS cod_clase_garantia_buro_fte,
-  CAST(NULL AS INTEGER)       AS num_cuotas_pactadas,
-  CAST(NULL AS DATE)          AS fecha_nov,
-  CAST(NULL AS DECIMAL(18,2)) AS valor_saldo,
-  CAST(NULL AS DECIMAL(18,2)) AS valor_cuota_mensual,
-  CAST(NULL AS INTEGER)       AS numero_dias_mora,
-  CAST(NULL AS INTEGER)       AS num_cuotas_pagadas
-FROM bdm_stage.mock_numeros
-WHERE 1 = 0
+  -- cod_dw_cta: SURROGADA, igual que cod_dw_persona_ubic. El legado tiene un
+  -- Cod_DW_Cta propio y el datashare no lo expone, de modo que se deriva de
+  -- (id, index), que es unico por cuenta dentro del contenedor. Mismo idioma
+  -- que las demas llaves (02_vistas_insumo_edf_views.sql).
+  FNV_HASH(CAST(ba.id AS VARCHAR) || ':' || CAST(ba."index" AS VARCHAR))  AS cod_dw_cta,
+  FNV_HASH(CAST(xpm.pin AS VARCHAR))                                      AS id_buro_persona,
+  CAST(xpm.pin AS BIGINT)                                                 AS cod_pin_persona,
+  -- El cod_suscriptor del legado son SEIS digitos y businesslinecode viene
+  -- con seis (C33b: len 6 en los dos lados). SUBSTRING por si alguno llega
+  -- mas largo: un CHAR(6) truncaria en silencio.
+  CAST(SUBSTRING(NULLIF(TRIM(ba."bestaccounts.val.businesslinecode"::VARCHAR), ''), 1, 6) AS CHAR(6))
+                                                                          AS cod_suscriptor,
+  CAST(NULLIF(TRIM(ba."bestaccounts.val.accounttype"::VARCHAR), '') AS VARCHAR(10))
+                                                                          AS cod_tipo_cta_fte,
+  -- cod_tipo_obligacion_fte: SIN FUENTE CONFIRMADA, y por eso NULL.
+  -- Los candidatos son typeofcredit (catalogo 18_SUBSCRIBER_TYPE_OF_CREDIT_NH)
+  -- y subaccounttype (238_SUBSCRIBER_SUB_ACCOUNT_TYPE_NH). Elegir mal cambia
+  -- una de las NUEVE columnas del clasificador Portafolio, asi que se deja
+  -- NULL y el CASE cae a su rama ELSE, que es lo que el legado hace sin dato.
+  CAST(NULL AS VARCHAR(10))                                               AS cod_tipo_obligacion_fte,
+  -- tipo de relacion con la cuenta: typeofdebtor. CONFIRMADO en RESULTADOS
+  -- seccion 18 con los catalogos 15, 16 y 17 (00 principal, 01 codeudor,
+  -- 04 avalista, 05 deudor solidario, 96 cotitular...).
+  CAST(NULLIF(TRIM(ba."bestaccounts.val.typeofdebtor"::VARCHAR), '') AS VARCHAR(10))
+                                                                          AS cod_tipo_rel_con_cta_fte,
+  -- clase de garantia: guaranteetype (catalogo 8_SUBSCRIBER_GUARANTEE_TYPE_NH).
+  -- NO es guaranteedetail (101 y 226), que es el detalle y no la clase.
+  CAST(ba."bestaccounts.val.guaranteetype" AS VARCHAR(10))                AS cod_clase_garantia_buro_fte,
+  CAST(ba."bestaccounts.val.totalnumberofinstallments" AS INTEGER)        AS num_cuotas_pactadas,
+  CASE WHEN ba."bestaccounts.val.cutoffdate" IS NOT NULL
+       THEN bdm_datos.convert_epoch_to_date(CAST(ba."bestaccounts.val.cutoffdate" AS BIGINT))
+       ELSE NULL
+  END                                                                     AS fecha_nov,
+  -- Las tres de valor viven en el comportamiento, no en la cuenta, y se toman
+  -- de la fila MAS RECIENTE por behaviourdate (fb.rn = 1).
+  CAST(fb.debtbalance        AS DECIMAL(18,2))                            AS valor_saldo,
+  CAST(fb.valuemonthlypayment AS DECIMAL(18,2))                           AS valor_cuota_mensual,
+  -- numero_dias_mora: SIN FUENTE CONFIRMADA, y por eso NULL. Los candidatos
+  -- son businessdelinquencymaturation (maduracion de la mora, en el
+  -- comportamiento) e installmentsoverdue (cuotas vencidas, que NO son dias).
+  -- Misma regla que arriba: antes de elegir, preguntar.
+  CAST(NULL AS INTEGER)                                                   AS numero_dias_mora,
+  CAST(fb.paidinstallments AS INTEGER)                                    AS num_cuotas_pagadas
+FROM ds_dba_rncr_batch.edf_views.xpm_bestaccounts ba
+INNER JOIN ds_dba_rncr_batch.edf_views.xpm xpm
+        ON xpm."bestaccounts" = ba.id
+LEFT JOIN (
+  SELECT fb0.id,
+         fb0."bestaccounts.val.frequentbehaviour.val.debtbalance"        AS debtbalance,
+         fb0."bestaccounts.val.frequentbehaviour.val.valuemonthlypayment" AS valuemonthlypayment,
+         fb0."bestaccounts.val.frequentbehaviour.val.paidinstallments"    AS paidinstallments,
+         ROW_NUMBER() OVER (
+           PARTITION BY fb0.id
+           ORDER BY fb0."bestaccounts.val.frequentbehaviour.val.behaviourdate" DESC NULLS LAST,
+                    fb0."index" DESC )                                    AS rn
+  FROM ds_dba_rncr_batch.edf_views.xpm_bestaccounts_val_frequentbehaviour fb0
+  WHERE fb0."index" IS NOT NULL
+) fb
+  ON  fb.id = ba."bestaccounts.val.frequentbehaviour"
+  AND fb.rn = 1
+WHERE ba."index" IS NOT NULL
 WITH NO SCHEMA BINDING;
 
--- Mismo trato para el comportamiento: el contrato declarado, la fuente
--- pendiente. El legado lo tiene en dos tablas y las lee como "existe fila".
+-- El comportamiento, con el MISMO cod_dw_cta que la vista de arriba.
+--
+-- LO QUE FALTA AQUI, Y ES CATALOGO, NO CODIGO: el legado parte el
+-- comportamiento en dos tablas, ACTIVO y PASIVO, y el Ordenamiento las lee
+-- como 'A' y 'P' (sp_ordenamiento_cuentas_edf.sql:107 y :115). En EDF hay UNA
+-- sola tabla de comportamiento y nada que diga de que lado cae cada cuenta:
+-- activo y pasivo son categorias del PRODUCTO (credito contra captacion), de
+-- modo que la regla sale del tipo de cuenta y de un catalogo que no tenemos.
+-- Se deja tipo en NULL A PROPOSITO: con NULL los dos predicados fallan y las
+-- dos banderas salen 'N', que es lo que hoy es cierto. Inventar la regla
+-- marcaria mal DOS de las nueve columnas del Portafolio, y el Portafolio
+-- decide el Sector, que entra en el score.
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_comportamiento_cta AS
 SELECT
-  CAST(NULL AS BIGINT)  AS cod_dw_cta,
-  CAST(NULL AS CHAR(1)) AS tipo,
-  CAST(NULL AS DATE)    AS fecha_corte
-FROM bdm_stage.mock_numeros
-WHERE 1 = 0
+  FNV_HASH(CAST(ba.id AS VARCHAR) || ':' || CAST(ba."index" AS VARCHAR))  AS cod_dw_cta,
+  CAST(NULL AS CHAR(1))                                                   AS tipo,
+  CASE WHEN fb."bestaccounts.val.frequentbehaviour.val.behaviourdate" IS NOT NULL
+       THEN bdm_datos.convert_epoch_to_date(
+              CAST(fb."bestaccounts.val.frequentbehaviour.val.behaviourdate" AS BIGINT))
+       ELSE NULL
+  END                                                                     AS fecha_corte
+FROM ds_dba_rncr_batch.edf_views.xpm_bestaccounts ba
+INNER JOIN ds_dba_rncr_batch.edf_views.xpm_bestaccounts_val_frequentbehaviour fb
+        ON fb.id = ba."bestaccounts.val.frequentbehaviour"
+       AND fb."index" IS NOT NULL
+WHERE ba."index" IS NOT NULL
 WITH NO SCHEMA BINDING;
