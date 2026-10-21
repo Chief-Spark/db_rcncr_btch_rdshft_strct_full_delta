@@ -273,3 +273,76 @@ WHERE NOT EXISTS (
   WHERE c.ambiente = a.ambiente
     AND c.parametro = p.parametro
 );
+
+-- ============================================================
+-- LAS DISTANCIAS ENTRAN A LA VIA MOCK (2026-10-21, d7)
+--
+-- Esta seccion desmiente la nota de la cabecera, que decia "sigue sin haber
+-- geo_distancias_mock: las distancias no entran en ninguno de los cinco
+-- criterios GEO". Sigue siendo cierto que no entran en los cinco -- no se
+-- toca ninguno --, pero SI entran en la tabla dominio d7
+-- (mat_info_punto_interes), y sin ellas esa tabla saldria VACIA en la
+-- bateria. Una tabla vacia no prueba nada: es la leccion de "un DELTA en
+-- cero no prueba que no haya cambios".
+--
+-- Dos piezas, las mismas que para georreferenciacion:
+--   1. bdm_datos.geo_distancias_mock, espejo de geo_distancias;
+--   2. bdm_stage.mock_geo_distancias, que ES el archivo de vuelta de
+--      ArcGIS_Externo con las 12 columnas crudas del contrato
+--      Salida_Distancias, y que sp_geo_cargar_distancias_mock lee con un
+--      INSERT en lugar del COPY.
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- bdm_datos.geo_distancias_mock -- PERMANENTE
+-- Espejo de bdm_datos.geo_distancias. Mismas columnas y mismas claves; la
+-- justificacion de tipos, de la clave 1:N y del rango de la distancia vive
+-- en 03_ddl_geo.sql y no se duplica aqui.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS bdm_datos.geo_distancias_mock (
+  cod_dw_ubic               BIGINT       NOT NULL,
+  lote                      INTEGER      NOT NULL,
+  tipo_punto_interes        VARCHAR(60)  NOT NULL,
+  cod_punto_interes_host    VARCHAR(60)  NOT NULL,
+  latitud                   DECIMAL(38,8),
+  longitud                  DECIMAL(38,8),
+  latitud_punto_interes     DECIMAL(38,8),
+  longitud_punto_interes    DECIMAL(38,8),
+  distancia_punto_interes   INTEGER,
+  nombre_punto_interes      VARCHAR(200),
+  fecha_actualizacion       DATE,
+  usuario_bd                VARCHAR(100)
+)
+DISTSTYLE KEY
+DISTKEY (cod_dw_ubic)
+SORTKEY (cod_dw_ubic, lote);
+
+-- ------------------------------------------------------------
+-- bdm_stage.mock_geo_distancias -- PERMANENTE
+-- EL ARCHIVO DE VUELTA de las distancias, columna por columna del contrato
+-- Salida_Distancias (Salida_Geo.pdf, seccion 3). Doce VARCHAR(500) crudos,
+-- igual que mock_geo_respuesta para georreferenciacion: el cargador valida y
+-- castea, y si aqui se declararan los tipos finales el mock se saltaria justo
+-- la parte que hay que certificar.
+--   col01 Cod_DW_Ubic   col07 Tipo_Punto_Interes
+--   col02 Lote          col08 Nombre_Punto_Interes
+--   col03 Direccion     col09 Latitud_Punto_Interes
+--   col04 Latitud       col10 Longitud_Punto_Interes
+--   col05 Longitud      col11 Distancia_Punto_Interes
+--   col06 Descripcion   col12 Cod_Punto_Interes_Host
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS bdm_stage.mock_geo_distancias (
+  col01  VARCHAR(500),   -- Cod_DW_Ubic
+  col02  VARCHAR(500),   -- Lote
+  col03  VARCHAR(500),   -- Direccion
+  col04  VARCHAR(500),   -- Latitud
+  col05  VARCHAR(500),   -- Longitud
+  col06  VARCHAR(500),   -- Descripcion_Proceso (DISTANCIAS)
+  col07  VARCHAR(500),   -- Tipo_Punto_Interes
+  col08  VARCHAR(500),   -- Nombre_Punto_Interes
+  col09  VARCHAR(500),   -- Latitud_Punto_Interes
+  col10  VARCHAR(500),   -- Longitud_Punto_Interes
+  col11  VARCHAR(500),   -- Distancia_Punto_Interes
+  col12  VARCHAR(500)    -- Cod_Punto_Interes_Host
+)
+DISTSTYLE EVEN;

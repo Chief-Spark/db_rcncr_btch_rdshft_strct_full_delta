@@ -19,3 +19,6 @@ DROP TABLE IF EXISTS bdm_stage.mock_geo_respuesta;
 DROP TABLE IF EXISTS bdm_datos.geo_atributos_mock;
 DROP TABLE IF EXISTS bdm_datos.geo_lote_control_mock;
 DROP TABLE IF EXISTS bdm_datos.geo_config_mock;
+-- 2026-10-21 (d7): las distancias mock.
+DROP TABLE IF EXISTS bdm_datos.geo_distancias_mock;
+DROP TABLE IF EXISTS bdm_stage.mock_geo_distancias;

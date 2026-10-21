@@ -105,6 +105,17 @@ CREATE TABLE IF NOT EXISTS bdm_datos.geo_distancias (
   latitud_punto_interes     DECIMAL(38,8),
   longitud_punto_interes    DECIMAL(38,8),
   distancia_punto_interes   INTEGER,               -- metros [0, 2147483647] (Req 4.6)
+  -- 2026-10-21 (d7): el NOMBRE del punto de interes, col08 del contrato
+  -- Salida_Distancias. Llegaba y se tiraba -- sp_geo_cargar_distancias.sql
+  -- lo decia en redondo: "no se guarda: geo_distancias no tiene columna; va
+  -- con Novedades d7" --, y es la columna NOMBRE de
+  -- MAT_INFO_PUNTO_INTERES (Novedad.sql:4794, PDIG.NOMBRE).
+  --   ANCHO DEL CONTRATO DE SALIDA: VARCHAR(200), como IN_NOMBRE del SCHEMA
+  --   P0035_13 (130.TPT:149). El crudo llega en VARCHAR(500) y se trunca al
+  --   cargar, que es lo que haria la tabla final de todos modos.
+  --   En un ambiente que ya tenga la tabla, la anade
+  --   sp_rcn_ctl_obs_migrar: CREATE TABLE IF NOT EXISTS no altera.
+  nombre_punto_interes      VARCHAR(200),
   fecha_actualizacion       DATE,
   usuario_bd                VARCHAR(100)
 )
