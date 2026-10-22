@@ -206,11 +206,10 @@ WHERE c.canal = 'EMA'
   AND c.valor_contacto LIKE '%@%'
 WITH NO SCHEMA BINDING;
 
--- Smoke: insumos son vistas (no tablas)
-SELECT 'v_rpu_post_unificacion' AS obj, COUNT(*)::BIGINT AS n FROM bdm_tempo.v_rpu_post_unificacion
-UNION ALL SELECT 'insumo_dir_vista', COUNT(*) FROM bdm_datos.insumo_direccion
-UNION ALL SELECT 'rpu_ganadoras_vista', COUNT(*) FROM bdm_tempo.v_rpu_post_unificacion WHERE COALESCE(ind_unificacion,0)<>1
-UNION ALL SELECT 'rpu_hijas_vista', COUNT(*) FROM bdm_tempo.v_rpu_post_unificacion WHERE COALESCE(ind_unificacion,0)=1;
+-- Smoke RETIRADO (job DEV/DATABASE #454). Ejecutaba las vistas, y una vista
+-- ejecutada arrastra el datashare y el catalogo divipola: un archivo de DDL
+-- no debe CONSULTAR, solo declarar. Mismo defecto que ya se corrigio en
+-- 02_catalogos_ordenamiento.sql el 2026-10-22.
 
 -- Redefinir filtro personas ganadoras (ya no depende de tabla local)
 CREATE OR REPLACE VIEW bdm_tempo.v_xpm_persona_dir_ganadora AS

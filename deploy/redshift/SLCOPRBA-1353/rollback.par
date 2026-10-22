@@ -18,7 +18,6 @@
 27_rollback_ddl_catalogo_hom_tipo_pto_int.sql
 26_rollback_ddl_catalogo_movilidad.sql
 25_rollback_ddl_catalogo_hom_tipo_ident.sql
-24_rollback_ddl_catalogo_divipola_cabecera.sql
 23_rollback_ddl_catalogo_portafolio_ord.sql
 22_rollback_ddl_catalogo_tipo_cuenta_ord.sql
 21_rollback_ddl_catalogos_dominio.sql
@@ -29,6 +28,7 @@
 06_rollback_vistas_mock_post_unificacion.sql
 05_rollback_ddl_ordenamiento_mock.sql
 04_rollback_vistas_insumo_ordenamiento.sql
+24_rollback_ddl_catalogo_divipola_cabecera.sql
 03_rollback_vistas_contacto_canal.sql
 02_rollback_carga_betas_ritm5226589.sql
 02_rollback_catalogos_ordenamiento.sql

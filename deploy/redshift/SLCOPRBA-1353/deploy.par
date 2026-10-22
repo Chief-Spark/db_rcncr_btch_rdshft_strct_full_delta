@@ -16,6 +16,7 @@
 01_ddl_ordenamiento.sql
 02_catalogos_ordenamiento.sql
 02_carga_betas_ritm5226589.sql
+24_ddl_catalogo_divipola_cabecera.sql
 03_vistas_contacto_canal_edf_views.sql
 04_vistas_insumo_ordenamiento_edf_views.sql
 05_ddl_ordenamiento_mock.sql
@@ -26,7 +27,6 @@
 21_ddl_catalogos_dominio.sql
 22_ddl_catalogo_tipo_cuenta_ord.sql
 23_ddl_catalogo_portafolio_ord.sql
-24_ddl_catalogo_divipola_cabecera.sql
 25_ddl_catalogo_hom_tipo_ident.sql
 26_ddl_catalogo_movilidad.sql
 27_ddl_catalogo_hom_tipo_pto_int.sql
