@@ -180,16 +180,16 @@ FROM (
          'legado PRO_Novedad_Linea_Catalogo (Novedad.sql:3). Dominio no portado a Redshift: el evaluador lo marca NO_IMPLEMENTADO' UNION ALL
   SELECT 'NOV-INB-01', 'OTROS_DOMINIOS', 'Alta', 'CONSULTA',
          'El proceso debe producir la informacion basica de la persona.',
-         'legado PRO_Novedad_Linea_Info_Basica (Novedad.sql:2166). Dominio no portado. Ademas depende de la decision funcional del filtro Mosaic (Novedad.sql:2479-2484)' UNION ALL
+         'legado PRO_Novedad_Linea_Info_Basica (Novedad.sql:2166). PORTADO el 2026-10-21 con 20 de las 22 columnas; no son las doce etapas sino una re-especificacion, porque en EDF las secciones best* ya son el registro mas confiable. El filtro Mosaic no le aplica: Mosaic toca Info_Basica en :2482 y queda fuera por decision legal (D-NOV-07)' UNION ALL
   SELECT 'NOV-CON-01', 'OTROS_DOMINIOS', 'Alta', 'CONSULTA',
          'El proceso debe producir la informacion de contactabilidad.',
-         'legado PRO_Novedad_Linea_Contact (Novedad.sql:186). Dominio no portado; ademas siete de sus once columnas son datos de gestion que no vienen del datashare' UNION ALL
+         'legado PRO_Novedad_Linea_Contact (Novedad.sql:186). PORTADO el 2026-10-21, pero solo 2 de sus 12 columnas se pueblan y las dos con otra semantica (D-NOV-08): la fuente de gestion no existe ni en el datashare ni en la documentacion de EDF. Un PASSED afirma que el dominio produce, no que produce completo' UNION ALL
   SELECT 'NOV-PIN-01', 'OTROS_DOMINIOS', 'Media', 'CONSULTA',
          'El proceso debe producir los puntos de interes cercanos a cada ubicacion.',
-         'legado PRO_Novedad_Linea_Punto_Interes (Novedad.sql:4585). Dominio no portado; falta ademas el nombre del punto de interes, que el contrato de distancias no persiste' UNION ALL
+         'legado PRO_Novedad_Linea_Punto_Interes (Novedad.sql:4585). PORTADO el 2026-10-21 con 7 de 10 columnas. La nota anterior era FALSA: el contrato de distancias SI trae el nombre, en col08; era geo_distancias la que no tenia columna, y ya la tiene (D-GEO-08)' UNION ALL
   SELECT 'NOV-MOV-01', 'OTROS_DOMINIOS', 'Media', 'CONSULTA',
          'El proceso debe producir los indicadores de movilidad.',
-         'legado PRO_Novedad_Linea_Indic_Movilidad (Novedad.sql:1508). Dominio no portado y depende integro del proceso P0029, cuya migracion esta pendiente' UNION ALL
+         'legado PRO_Novedad_Linea_Indic_Movilidad (Novedad.sql:1508). PORTADO el 2026-10-21 con 3 de los 4 indicadores. La nota anterior era FALSA: P0029 SI esta en el repo (4 archivos) y el lado Novedades tambien; lo que faltaba era el productor de MTCalcularIndicadoresMovilidad, construido como nov_movilidad_foto. Falta Cambio de Localidad porque LOCALIDAD no existe en EDF' UNION ALL
 
   -- ---------- ACTIVIDAD ECONOMICA ----------
   -- Segundo dominio portado. El legado es PRO_Novedad_Linea_Historial
