@@ -1,22 +1,49 @@
-# db_rcncr_btch_rdshft_strct — Estructura Unificación (edf_views)
+# Reconocer Redshift — paquete STRCT (estructura)
 
-Paquete **type: struct** — schemas, DDL salida y vistas `bdm_tempo.v_xpm_*` sobre datashare `edf_views`.
+Unificación de direcciones, Ordenamiento, GEO y Novedades de Experian
+Reconocer, migrados de Teradata a Amazon Redshift.
 
-## Orden de deploy (`deploy.par`)
+**`type: struct` · `order: 1` · se despliega el PRIMERO de los tres.**
 
-| # | Archivo | Contenido |
-|---|---------|-----------|
-| 1 | `00_prerequisitos_schemas.sql` | `bdm_datos`, `bdm_tempo`, `convert_epoch_to_date` |
-| 2 | `01_ddl_unificacion_direccion.sql` | Tabla salida + catálogos locales |
-| 3 | `02_vistas_insumo_edf_views.sql` | Vistas lectura datashare (sin copiar XPM) |
+Sólo DDL: schemas, tablas, vistas, catálogos y funciones. Ningún
+procedimiento de negocio y ningún dato.
 
-Desplegar **antes** de `_pgm` y `_dt`.
+## Qué hay en el paquete
 
-## QA DEV
+| Ruta | Contenido |
+|---|---|
+| `deploy/redshift/SLCOPRBA-1353/deploy.par` | el orden de despliegue, una línea por archivo |
+| `deploy/redshift/SLCOPRBA-1353/SQL/` | 49 archivos de DDL |
+| `deploy/redshift/SLCOPRBA-1353/rollback.par` | el reverso exacto, en orden inverso |
+| `deploy/redshift/SLCOPRBA-1353/RevSQL/` | un reverso por archivo |
 
-Validado 2026-09-04 — ver `../db_rcncr_btch_rdshft_dt/docs/Evidencias_QA_UNIFICACION_ESCENARIOS_DEV.md`
+Cubre las cuatro vertientes: Unificación (`01`–`03`), Ordenamiento
+(`04`–`12`, `20`–`27`), GEO (`03`) y Novedades (`30`–`39`), más las siete
+tablas dominio `bdm_datos.mat_*` que son la entrega al Batch.
 
-## Documentación
+## Orden de despliegue
 
-- Mapa negocio HTML: `../db_rcncr_btch_rdshft_dt/docs/MAPA_UNIFICACION_EDF_VIEWS_NEGOCIO.html`
-- Checklist Manuel: `../db_rcncr_btch_rdshft_dt/docs/CHECKLIST_REVISION_MANUEL_DATOS_REALES.md`
+**`strct` → `pgm` → `dt`.** Las vistas van `WITH NO SCHEMA BINDING`
+precisamente para que ese orden no las rompa, pero los procedimientos de
+`pgm` sí necesitan que las tablas existan.
+
+## Convenciones que el pipeline exige
+
+| Código | Causa |
+|---|---|
+| `REDSHIFT:112` | error SQL durante el deploy — es lo único que tumba el build |
+| `REDSHIFT:207` | BOM en un `.par` — van en UTF-8 **sin** BOM |
+| `REDSHIFT:219` | un archivo de `RevSQL/` con basename distinto al de `rollback.par` |
+| `REDSHIFT:232` | `UPDATE`/`DELETE` de nivel superior sin `WHERE` |
+| `JENKINS:104/105` | rama sin el ID de la subtarea |
+
+DDL idempotente (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE VIEW`),
+UTF-8 sin BOM y ASCII sin acentos dentro de `deploy/`. Nunca
+`GRANT … TO PUBLIC` ni `DROP SCHEMA … CASCADE`: `bdm_datos` es compartido.
+
+## De dónde sale esto
+
+Este repositorio es **sólo de despliegue**. El trabajo, la bitácora de
+divergencias contra el legado, el banco de pruebas local y los validadores
+viven en el repositorio de GitHub del equipo; aquí llega únicamente
+`deploy/redshift/` y este `.jenkins.yml`.
