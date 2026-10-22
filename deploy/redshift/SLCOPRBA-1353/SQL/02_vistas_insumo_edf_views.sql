@@ -822,17 +822,23 @@ SELECT
   -- RUT: el legado marca 'S' cuando la persona existe en VU_PERSONA con
   -- COD_DW_FTE_DATO = 2 (Novedad.sql:3478-3483). En EDF el equivalente
   -- declarado es el indicador de registro tributario del ciudadano.
-  --   EL BOOLEANO SE COMPARA COMO TEXTO, con el mismo idiom que el resto del
-  --   archivo (::VARCHAR + TRIM + NULLIF) y por el mismo motivo que
-  --   typeofdata mas arriba: en el datashare la columna es BOOLEAN y un
-  --   IS TRUE vale, pero el stub del banco la declara VARCHAR y revienta con
-  --   "argument of IS TRUE must be type boolean". En Redshift un BOOLEAN
-  --   casteado a VARCHAR da 'true' / 'false', de modo que la comparacion es
-  --   correcta en los dos y no cambia el resultado. Se aceptan tambien 't' y
-  --   '1' porque son las otras dos formas en que un booleano llega como
-  --   texto.
-  CASE WHEN LOWER(NULLIF(TRIM(xpm."bestpersonalinformation.citizentaxregistrationindicator"::VARCHAR), ''))
-            IN ('true', 't', '1')
+  --   EL BOOLEANO SE USA COMO BOOLEANO, y antes NO: se comparaba como texto
+  --   con ::VARCHAR, y esa linea afirmaba que "en Redshift un BOOLEAN
+  --   casteado a VARCHAR da 'true' / 'false'".
+  --
+  --   ES FALSO (job DEV/DATABASE #458):
+  --     42846: ERROR: cannot cast type boolean to character varying
+  --
+  --   Redshift no tiene ese cast. El patron se escribio para valer en el
+  --   banco Y en Redshift y no valia en ninguno de los dos: tumbaba la VISTA
+  --   entera, no solo el INSERT que la consume, de modo que Info basica
+  --   nunca pudo escribir una fila por la via real. El stub del banco no lo
+  --   cazo porque declaraba la columna VARCHAR; eso tambien esta corregido.
+  --
+  --   Medido contra DEV: es la UNICA columna boolean de edf_views.xpm.
+  --   Un booleano es un predicado y se usa directo, que es lo natural en los
+  --   dos motores. NULL cae al ELSE, exactamente igual que antes.
+  CASE WHEN xpm."bestpersonalinformation.citizentaxregistrationindicator"
        THEN CAST('S' AS VARCHAR(1))
        ELSE CAST('N' AS VARCHAR(1))
   END                                                             AS rut
@@ -858,10 +864,12 @@ LEFT JOIN (
            b0."bestidentifications.val.issuedate"         AS issuedate,
            ROW_NUMBER() OVER (
              PARTITION BY b0.id
-             -- Mismo motivo que el booleano del RUT: comparado como texto
-             -- para que valga en el datashare y en el stub del banco.
-             ORDER BY CASE WHEN LOWER(NULLIF(TRIM(b0."bestidentifications.val.officialsourcevalidationstatus"::VARCHAR), ''))
-                                IN ('true', 't', '1')
+             -- Mismo defecto que el booleano del RUT y misma correccion
+             -- (#458): officialsourcevalidationstatus es BOOLEAN en el
+             -- datashare -- posicion 18 de xpm_bestidentifications, medido
+             -- con SVV_ALL_COLUMNS -- y Redshift no la castea a VARCHAR.
+             -- Se usa como predicado. NULL cae al ELSE, igual que antes.
+             ORDER BY CASE WHEN b0."bestidentifications.val.officialsourcevalidationstatus"
                            THEN 0 ELSE 1 END,
                       b0."index"
            ) AS rn
