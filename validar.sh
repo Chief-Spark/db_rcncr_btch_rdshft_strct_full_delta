@@ -377,10 +377,17 @@ echo "11) simetria de objetos: todo CREATE de SQL/ con su DROP en RevSQL/"
 SIM=$(python3 -I - "$ROOT" <<'PYEOF'
 import re, sys, os, glob
 raiz = sys.argv[1]
+# LOS TRES ESQUEMAS SON COMPARTIDOS Y NINGUNO SE BORRA DESDE strct.
 # bdm_datos y bdm_tempo alojan los SP de pgm: DROP SCHEMA CASCADE los arrasa
 # (incidente strct #256). La funcion no se dropea porque Redshift no admite
 # DROP FUNCTION IF EXISTS (leccion #10) y reventaria el precheck en limpio.
-EXC = {("SCHEMA", "bdm_datos"), ("SCHEMA", "bdm_tempo"),
+# bdm_stage se anadio el 2026-10-22: tiene 23 objetos AJENOS en DEV -- la
+# sandbox pp9999 entera y seis funciones sp_ordenamiento_*/sp_geo_* de una
+# version anterior --, de modo que el DROP sin CASCADE fallaba en cada
+# RLLBCK_PRECHECK con [REDSHIFT:112] codigo 8 (job DEV/DATABASE #453), y con
+# CASCADE seria el incidente #256. Nuestras tablas de ahi si tienen su DROP,
+# en 02a_rollback y 02c_rollback.
+EXC = {("SCHEMA", "bdm_datos"), ("SCHEMA", "bdm_tempo"), ("SCHEMA", "bdm_stage"),
        ("FUNCTION", "bdm_datos.convert_epoch_to_date")}
 CREA  = re.compile(r"CREATE\s+(?:OR\s+REPLACE\s+)?(TABLE|VIEW|PROCEDURE|FUNCTION|SCHEMA)"
                    r"(?:\s+IF\s+NOT\s+EXISTS)?\s+([A-Za-z_][\w.]*)", re.I)

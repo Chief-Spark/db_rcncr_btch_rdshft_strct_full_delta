@@ -1,6 +1,47 @@
 -- Catalogos ordenamiento - interim DEV hasta IFR/datashare oficial
 -- Reemplazar carga sector_financiero cuando IFR entregue catalogo
 
+-- ------------------------------------------------------------
+-- EL CATALOGO SE QUEDA VACIO A PROPOSITO DESDE EL 2026-10-22, Y ESTE ERA EL
+-- UNICO ARCHIVO DE DDL QUE CONSULTABA EL DATASHARE AL DESPLEGAR.
+--
+-- La carga era
+--   INSERT ... SELECT DISTINCT rep.id_buro_suscriptor, CASE WHEN >= 901 ...
+--   FROM bdm_tempo.v_xpm_reporte_relacion_persona_ubica
+-- y esa vista lee ds_dba_rncr_batch.edf_views.xpm (:574). Redshift la
+-- RECHAZA, y no por permisos ni por sintaxis:
+--   XX000: cross-cluster query of the masked relation "xpm" is not supported
+-- Tumbo el job DEV/DATABASE #453 con [REDSHIFT:112] codigo 12, en el archivo
+-- 17 de 49, dejando el despliegue de strct a medias.
+--
+-- SE QUITA LA CARGA, NO LA TABLA: otros archivos la leen y tiene que existir.
+-- El resultado es el MISMO que ya daba -- el propio log del #453 imprime
+-- `catalogo_sector_financiero | 0` --, de modo que esto no pierde ni una fila
+-- y desbloquea el despliegue.
+--
+-- Y NO ES UNA PERDIDA FUNCIONAL, que es lo que permite cerrarlo asi: esta
+-- bandera es ruido medido. Se carga como
+-- `CASE WHEN id_buro_suscriptor >= 901 THEN 1 ELSE 0 END`, y ese
+-- id_buro_suscriptor es un COALESCE cuyo ultimo recurso es
+-- `MOD(ABS(FNV_HASH(pin || ':' || ci.id)), 9998) + 1`
+-- (02_vistas_insumo_edf_views.sql:326-333): para todo reporte sin
+-- counterpartyidnumber el sector sale de una cubeta de hash. El Sector del
+-- legado toma valores en {CO, CC, RE, FI, OT} con grano por CUENTA, que una
+-- bandera 0/1 no distingue.
+--
+-- UN CATALOGO NO SE CARGA DE UNA CONSULTA EN TIEMPO DE DDL, ademas: ata el
+-- despliegue de la estructura a que el dato este disponible. El dia que
+-- llegue el catalogo oficial de IFR entra como INSERT de literales, igual
+-- que los otros tres de este archivo.
+--
+-- LO QUE ESTO NO ARREGLA, y hay que leerlo antes de celebrar el verde: la
+-- relacion xpm esta enmascarada y es la RAIZ de la via real
+-- (id_buro_persona = FNV_HASH(xpm.pin)). Hay 17 referencias a ella en los
+-- tres archivos de vistas. Mientras siga enmascarada, ninguna consulta de la
+-- via real devuelve una fila. Peticion en
+-- dt/docs/PETICION_RELACION_XPM_ENMASCARADA.md.
+-- ------------------------------------------------------------
+
 CREATE TABLE IF NOT EXISTS bdm_datos.catalogo_sector_financiero (
   id_buro_suscriptor INTEGER ENCODE AZ64,
   sector_financiero  INTEGER ENCODE AZ64
@@ -8,13 +49,6 @@ CREATE TABLE IF NOT EXISTS bdm_datos.catalogo_sector_financiero (
 DISTSTYLE ALL;
 
 TRUNCATE TABLE bdm_datos.catalogo_sector_financiero;
-
-INSERT INTO bdm_datos.catalogo_sector_financiero (id_buro_suscriptor, sector_financiero)
-SELECT DISTINCT
-  rep.id_buro_suscriptor,
-  CASE WHEN rep.id_buro_suscriptor >= 901 THEN 1 ELSE 0 END
-FROM bdm_tempo.v_xpm_reporte_relacion_persona_ubica rep
-WHERE rep.id_buro_suscriptor IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS bdm_datos.catalogo_tipo_cuenta_tel (
   prefijo_operador VARCHAR(3) ENCODE ZSTD,

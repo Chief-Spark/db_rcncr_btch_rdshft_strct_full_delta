@@ -6,17 +6,28 @@
 -- DROP SCHEMA ... CASCADE los arrasa: incidente strct #256, que dejo a dt
 -- cayendo con 42883. CREATE SCHEMA IF NOT EXISTS en el DPLY es suficiente.
 --
--- bdm_stage SI, Y SIN CASCADE. Es nuestro y solo tiene semillas mock; el
--- DPLY lo crea y hasta ahora nadie lo borraba, de modo que en un ambiente
--- limpio sobrevivia al rollback y rompia la comparacion DDL_1 vs DDL_3 del
--- pipeline (job QA/DATABASE #122, [REDSHIFT:335]).
+-- bdm_stage TAMPOCO SE BORRA, DESDE EL 2026-10-22. Aqui habia un
+-- `DROP SCHEMA IF EXISTS bdm_stage` sin CASCADE, puesto para que el esquema
+-- no sobreviviera al rollback y no rompiera la comparacion DDL_1 vs DDL_3
+-- (job QA/DATABASE #122, [REDSHIFT:335]). Se retira por dos motivos:
 --
--- SIN CASCADE ES LA PARTE QUE IMPORTA, y es lo que lo separa del #256: si
--- alguien dejo un objeto dentro, la sentencia FALLA en vez de arrasar con el.
--- Esa es exactamente la propiedad que se quiere de un rollback.
+-- 1. LA PREMISA ERA FALSA. Decia "es nuestro y solo tiene semillas mock". En
+--    DEV tiene 23 objetos AJENOS: la sandbox `pp9999_*` entera -- su tabla
+--    marcador y quince funciones -- mas `sp_ordenamiento_cargar_seed_mock`,
+--    `sp_ordenamiento_validar_mock`, `sp_ordenamiento_ejecucion_mock`,
+--    `sp_geo_exportar_insumo`, `sp_geo_ciclo_lote` y
+--    `sp_geo_reenganchar_r3`, creadas ahi por una version anterior.
+-- 2. POR ESO FALLA EN CADA CORRIDA: `cannot drop schema bdm_stage because
+--    other objects depend on it`, que el pipeline reporta como
+--    `[REDSHIFT:112] codigo 8` en el RLLBCK_PRECHECK y estampa en la
+--    subtarea de Jira (job DEV/DATABASE #453).
+--
+-- El SIN CASCADE hizo su trabajo -- fallar en vez de arrasar, que es lo que
+-- lo separaba del incidente #256 --, pero un rollback que falla siempre no
+-- es un rollback. Nuestras tablas de bdm_stage las borran una a una
+-- 02a_rollback_ddl_bdm_stage_insumo_mock y 02c_rollback_ddl_mock_numeros, de
+-- modo que la simetria se cumple sin tocar lo que no es nuestro.
 -- UTF-8 sin BOM, sin acentos.
 -- ============================================================
-
-DROP SCHEMA IF EXISTS bdm_stage;
 
 SELECT 1;
