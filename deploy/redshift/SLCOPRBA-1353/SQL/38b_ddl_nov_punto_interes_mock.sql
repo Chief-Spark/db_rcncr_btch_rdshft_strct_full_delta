@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS bdm_datos.mat_info_punto_interes_mock (
   nit_entidad                      VARCHAR(20),    -- NULL: idem
   latitud                          VARCHAR(40),    -- del PUNTO DE INTERES. VARCHAR por el contrato
   longitud                         VARCHAR(40),    -- idem
-  tipo                             VARCHAR(30),    -- NULL: falta V_Hom_Tipo_Pto_Int_Linea
+  tipo                             VARCHAR(30),    -- codigo Linea (catalogo de homologacion)
   lote                             INTEGER,
   fecha_actualizacion              TIMESTAMP DEFAULT GETDATE(),
   usuario_bd                       VARCHAR(100)

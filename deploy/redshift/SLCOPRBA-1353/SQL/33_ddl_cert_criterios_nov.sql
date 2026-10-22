@@ -186,10 +186,10 @@ FROM (
          'legado PRO_Novedad_Linea_Contact (Novedad.sql:186). PORTADO el 2026-10-21, pero solo 2 de sus 12 columnas se pueblan y las dos con otra semantica (D-NOV-08): la fuente de gestion no existe ni en el datashare ni en la documentacion de EDF. Un PASSED afirma que el dominio produce, no que produce completo' UNION ALL
   SELECT 'NOV-PIN-01', 'OTROS_DOMINIOS', 'Media', 'CONSULTA',
          'El proceso debe producir los puntos de interes cercanos a cada ubicacion.',
-         'legado PRO_Novedad_Linea_Punto_Interes (Novedad.sql:4585). PORTADO el 2026-10-21 con 7 de 10 columnas. La nota anterior era FALSA: el contrato de distancias SI trae el nombre, en col08; era geo_distancias la que no tenia columna, y ya la tiene (D-GEO-08)' UNION ALL
+         'legado PRO_Novedad_Linea_Punto_Interes (Novedad.sql:4585). PORTADO el 2026-10-21 y con 8 de 10 columnas desde el 2026-10-22, cuando llego V_Hom_Tipo_Pto_Int_Linea y tipo dejo de ir en NULL. La nota anterior era FALSA: el contrato de distancias SI trae el nombre, en col08; era geo_distancias la que no tenia columna, y ya la tiene (D-GEO-08)' UNION ALL
   SELECT 'NOV-MOV-01', 'OTROS_DOMINIOS', 'Media', 'CONSULTA',
          'El proceso debe producir los indicadores de movilidad.',
-         'legado PRO_Novedad_Linea_Indic_Movilidad (Novedad.sql:1508). PORTADO el 2026-10-21 con 3 de los 4 indicadores. La nota anterior era FALSA: P0029 SI esta en el repo (4 archivos) y el lado Novedades tambien; lo que faltaba era el productor de MTCalcularIndicadoresMovilidad, construido como nov_movilidad_foto. Falta Cambio de Localidad porque LOCALIDAD no existe en EDF' UNION ALL
+         'legado PRO_Novedad_Linea_Indic_Movilidad (Novedad.sql:1508). PORTADO el 2026-10-21 con 3 de los 4 indicadores. La nota anterior era FALSA: P0029 SI esta en el repo (4 archivos) y el lado Novedades tambien; lo que faltaba era el productor de MTCalcularIndicadoresMovilidad, construido como nov_movilidad_foto. Falta Cambio de Localidad porque LOCALIDAD no existe en EDF, y el catalogo de homologacion que llego el 2026-10-22 abarata esa ausencia: Localidad y Direccion homologan las dos a CAM_LOC, de modo que los 3 indicadores portados cubren los 3 codigos de Linea distintos. Ese mismo dia las 8 columnas quedaron pobladas' UNION ALL
 
   -- ---------- ACTIVIDAD ECONOMICA ----------
   -- Segundo dominio portado. El legado es PRO_Novedad_Linea_Historial

@@ -64,10 +64,10 @@ SORTKEY (cod_dw_persona_ubic, fecha_foto);
 CREATE TABLE IF NOT EXISTS bdm_datos.mat_info_movilidad_mock (
   id                     BIGINT,         -- derivada: FNV_HASH(persona|indicador|fecha)
   fecha                  DATE,           -- cuando se detecto el cambio
-  descripcion            VARCHAR(100),   -- NULL: falta V_INDICADOR_MOVILIDAD
+  descripcion            VARCHAR(100),   -- la FRASE larga del indicador (catalogo)
   novedad                VARCHAR(1000),  -- 'Cambio de Direccion' | 'de Ciudad' | 'de Estrato'
   info_basica_id         BIGINT,         -- id_buro_persona
-  novedad_2              VARCHAR(30),    -- NULL: falta V_Hom_Ind_Mov_Linea
+  novedad_2              VARCHAR(30),    -- codigo Linea: CAM_LOC | CAM_CIU | CAM_EST
   tipo_identificacion    VARCHAR(30),
   numero_identificacion  BIGINT,
   lote                   INTEGER,

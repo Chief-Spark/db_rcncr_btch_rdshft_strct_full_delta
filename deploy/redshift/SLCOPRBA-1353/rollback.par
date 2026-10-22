@@ -15,6 +15,8 @@
 31_rollback_ddl_nov_control.sql
 30b_rollback_ddl_novedades_mock.sql
 30_rollback_ddl_novedades.sql
+27_rollback_ddl_catalogo_hom_tipo_pto_int.sql
+26_rollback_ddl_catalogo_movilidad.sql
 25_rollback_ddl_catalogo_hom_tipo_ident.sql
 24_rollback_ddl_catalogo_divipola_cabecera.sql
 23_rollback_ddl_catalogo_portafolio_ord.sql

@@ -47,9 +47,12 @@
 --       su columna ID.
 --   latitud / longitud      col09 y col10, las del PUNTO DE INTERES y no las
 --       de la ubicacion. El legado las toma de PDIG, la vista del punto.
---   tipo                    NULL. Falta V_Hom_Tipo_Pto_Int_Linea, el
---       catalogo de homologacion que el legado cruza por
---       Cod_Tipo_Punto_Interes_Host (Novedad.sql:4888-4890).
+--   tipo                    el codigo de Linea, de V_Hom_Tipo_Pto_Int_Linea
+--       (27_ddl_catalogo_hom_tipo_pto_int.sql, desde el 2026-10-22). El
+--       legado lo cruza por Cod_Tipo_Punto_Interes_Host (Novedad.sql:4879,
+--       :4891), que es columna de V_TIPO_PUNTO_INTERES y no tenemos; se une
+--       por tipo_punto_interes, la col07 del contrato. Hipotesis anotada en
+--       la cabecera del catalogo, con la consulta que la cierra.
 --   nombre_entidad          NULL. Sale de RELACION_PUNTO_INTERES_X_PERS
 --   nit_entidad             NULL. (NOMBRE_SUSCRIPTOR y NUM_IDENT,
 --       Novedad.sql:4801-4802), una tabla que no existe de este lado y que no
@@ -84,7 +87,7 @@ CREATE TABLE IF NOT EXISTS bdm_datos.mat_info_punto_interes (
   nit_entidad                      VARCHAR(20),    -- NULL: idem
   latitud                          VARCHAR(40),    -- del PUNTO DE INTERES. VARCHAR por el contrato
   longitud                         VARCHAR(40),    -- idem
-  tipo                             VARCHAR(30),    -- NULL: falta V_Hom_Tipo_Pto_Int_Linea
+  tipo                             VARCHAR(30),    -- codigo Linea (catalogo de homologacion)
   lote                             INTEGER,
   fecha_actualizacion              TIMESTAMP DEFAULT GETDATE(),
   usuario_bd                       VARCHAR(100)

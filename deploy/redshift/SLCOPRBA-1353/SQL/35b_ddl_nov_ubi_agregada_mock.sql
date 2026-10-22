@@ -55,7 +55,7 @@ DISTSTYLE KEY DISTKEY (info_basica)
 SORTKEY (info_basica, ubicacion_dato);
 
 CREATE TABLE IF NOT EXISTS bdm_datos.mat_ubicacion_agregada_mock (
-  tipo_identificacion             VARCHAR(30),    -- BLOQUEADA: falta V_Hom_Tip_Ident_Linea
+  tipo_identificacion             VARCHAR(30),    -- SI se puebla desde el 2026-10-21 (llego el catalogo)
   numero_identificacion           BIGINT,
   info_basica                     BIGINT,         -- id_buro_persona; BIGINT, ver cabecera
   codigo_dane                     VARCHAR(20),

@@ -41,14 +41,15 @@
 -- EL CONTRATO SON 8 COLUMNAS, del SCHEMA P0035_12 (130.TPT:134-143) menos
 -- IN_Severidad. Mas las tres de trazabilidad.
 --
--- SEIS DE LAS OCHO SE POBLAN. Las dos que no:
---   descripcion -> VIM.VALOR_INDICADOR_MOVILIDAD (Novedad.sql:1782). Sale del
---       catalogo V_INDICADOR_MOVILIDAD, que no se entrego.
---   novedad_2   -> V_Hom_Ind_Mov_Linea (:1923-1924), tampoco entregado.
--- `novedad` SI se puebla: es la DESCRIPCION del indicador y sus valores son
--- los literales que el propio P0029 escribe en su filtro ('Cambio de
--- Direccion', 'Cambio de Estrato', 'Cambio de Ciudad'). No hace falta
--- catalogo para eso.
+-- LAS OCHO SE POBLAN desde el 2026-10-22. Hasta esa fecha eran seis: las
+-- dos que faltaban, `descripcion` (VIM.VALOR_INDICADOR_MOVILIDAD,
+-- Novedad.sql:1782) y `novedad_2` (V_Hom_Ind_Mov_Linea, :1923-1924), salen
+-- de los dos catalogos que llegaron ese dia
+-- (26_ddl_catalogo_movilidad.sql).
+-- `novedad` ya se poblaba sin catalogo: es el NOMBRE CORTO del indicador y
+-- sus valores son los literales que el propio P0029 escribe en su filtro
+-- ('Cambio de Direccion', 'Cambio de Estrato', 'Cambio de Ciudad'). Resulta
+-- que ademas es la LLAVE con la que los dos catalogos se unen.
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS bdm_datos;
 
@@ -109,10 +110,10 @@ SORTKEY (cod_dw_persona_ubic, fecha_foto);
 CREATE TABLE IF NOT EXISTS bdm_datos.mat_info_movilidad (
   id                     BIGINT,         -- derivada: FNV_HASH(persona|indicador|fecha)
   fecha                  DATE,           -- cuando se detecto el cambio
-  descripcion            VARCHAR(100),   -- NULL: falta V_INDICADOR_MOVILIDAD
+  descripcion            VARCHAR(100),   -- la FRASE larga del indicador (catalogo)
   novedad                VARCHAR(1000),  -- 'Cambio de Direccion' | 'de Ciudad' | 'de Estrato'
   info_basica_id         BIGINT,         -- id_buro_persona
-  novedad_2              VARCHAR(30),    -- NULL: falta V_Hom_Ind_Mov_Linea
+  novedad_2              VARCHAR(30),    -- codigo Linea: CAM_LOC | CAM_CIU | CAM_EST
   tipo_identificacion    VARCHAR(30),
   numero_identificacion  BIGINT,
   lote                   INTEGER,

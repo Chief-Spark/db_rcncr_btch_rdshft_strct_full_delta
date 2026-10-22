@@ -28,6 +28,8 @@
 23_ddl_catalogo_portafolio_ord.sql
 24_ddl_catalogo_divipola_cabecera.sql
 25_ddl_catalogo_hom_tipo_ident.sql
+26_ddl_catalogo_movilidad.sql
+27_ddl_catalogo_hom_tipo_pto_int.sql
 30_ddl_novedades.sql
 30b_ddl_novedades_mock.sql
 31_ddl_nov_control.sql
