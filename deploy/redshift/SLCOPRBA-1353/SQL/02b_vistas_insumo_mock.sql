@@ -410,7 +410,10 @@ SELECT
        || ' APELLIDO' || CAST(p.id_buro_persona AS VARCHAR(20)) AS VARCHAR(200)) AS nombre_completo,
   p.cod_tipo_ident_fte,
   -- 2026-10-21: YA NO ES NULL, igual que en el real. El catalogo llego.
-  CAST(hti.descripcion AS VARCHAR(100))                       AS tipo_identificacion,
+  -- 2026-10-23: el ancho pasa de 100 a 30, que es el que declara
+  -- 37_ddl_nov_info_basica.sql. Mismo arreglo que en el real: era una
+  -- incoherencia nuestra entre la vista y la tabla, no un limite del mock.
+  CAST(hti.descripcion AS VARCHAR(30))                        AS tipo_identificacion,
   p.cod_pin_persona                                           AS numero_identificacion,
   -- Dos estados, para que la columna no sea constante: 00 vigente y
   -- 21 cancelada por muerte, que son los dos que D-EDF-13 da por confirmados
@@ -434,7 +437,7 @@ SELECT
        ELSE NULL
   END                                                         AS razon_social,
   -- No existe en EDF (Confluence CCBR 251264543), igual que en el real.
-  CAST(NULL AS VARCHAR(200))                                  AS pagina_web,
+  CAST(NULL AS VARCHAR(100))                                  AS pagina_web,
   -- Mosaic fuera por decision legal (D-NOV-07), igual que en el real.
   CAST(NULL AS INTEGER)                                       AS mosaic_id,
   CAST('CUNDINAMARCA' AS VARCHAR(100))                        AS departamento_expedicion,

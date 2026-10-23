@@ -748,11 +748,27 @@ SELECT
        THEN CAST(NULLIF(TRIM(xpm.pin::VARCHAR), '') AS BIGINT)
        ELSE NULL
   END                                                             AS cod_pin_persona,
-  NULLIF(TRIM(xpm."bestname.firstname"::VARCHAR), '')             AS primer_nombre,
-  NULLIF(TRIM(xpm."bestname.secondname"::VARCHAR), '')            AS segundo_nombre,
-  NULLIF(TRIM(xpm."bestname.firstlastname"::VARCHAR), '')         AS primer_apellido,
-  NULLIF(TRIM(xpm."bestname.secondlastname"::VARCHAR), '')        AS segundo_apellido,
-  NULLIF(TRIM(xpm."bestname.fullname"::VARCHAR), '')              AS nombre_completo,
+  -- ACOTADAS AL ANCHO DE SU CONTRATO (job DEV/DATABASE #477). En EDF estos
+  -- campos NO tienen tope y mat_info_basica los declara con el ancho que fija
+  -- el legado (P0035_Extractor_Novedades_130.TPT:97, IN_NOMBRE_COMPLETO
+  -- VARCHAR(200)): un fullname real de mas de 200 caracteres tumbo el build
+  -- con [REDSHIFT:112] XX000 "Value too long for type character varying(200)".
+  --   VA CON CAST Y NO CON LEFT, y la diferencia importa: VARCHAR(n) en
+  --   Redshift son n BYTES y LEFT() corta CARACTERES, de modo que 200
+  --   caracteres acentuados son hasta 400 bytes y volverian a desbordar. El
+  --   CAST explicito al ancho de la columna es ademas lo que la documentacion
+  --   de Redshift da como forma de conservar los caracteres de cabeza.
+  --   SE TRUNCA Y NO SE ENSANCHA LA COLUMNA a proposito: el ancho es el del
+  --   legado y el Batch de salida recorta a CHAR(100) aguas abajo
+  --   (P0033_BATCH2_EXPORTPLANO_111.BTQ:1141), asi que nada que llegue al
+  --   consumidor se pierde. Decision del usuario, 2026-10-23.
+  --   ONCE COLUMNAS DE ESTA MISMA CLASE, no una: solo fallo la primera porque
+  --   el motor para en el primer error. Misma leccion que el enmascaramiento.
+  CAST(NULLIF(TRIM(xpm."bestname.firstname"::VARCHAR), '') AS VARCHAR(100))      AS primer_nombre,
+  CAST(NULLIF(TRIM(xpm."bestname.secondname"::VARCHAR), '') AS VARCHAR(100))     AS segundo_nombre,
+  CAST(NULLIF(TRIM(xpm."bestname.firstlastname"::VARCHAR), '') AS VARCHAR(100))  AS primer_apellido,
+  CAST(NULLIF(TRIM(xpm."bestname.secondlastname"::VARCHAR), '') AS VARCHAR(100)) AS segundo_apellido,
+  CAST(NULLIF(TRIM(xpm."bestname.fullname"::VARCHAR), '') AS VARCHAR(200))       AS nombre_completo,
   -- VARCHAR(20) y NO INTEGER, por la misma razon que en
   -- v_xpm_contacto_direccion: el legado lo usa como llave de join contra el
   -- catalogo de tipos y un personidtype de mas de 10 digitos aborta el cast
@@ -764,7 +780,11 @@ SELECT
   -- por Valor_Fuente = COD_TIPO_IDENT_FTE (Novedad.sql:3455, :3475-3476).
   --   LEFT JOIN y no INNER: un tipo fuera del catalogo tiene que salir NULL y
   --   no perder la persona, que es lo que hace el legado.
-  CAST(hti.descripcion AS VARCHAR(100))                           AS tipo_identificacion,
+  --   EL ANCHO ES 30 Y NO 100: lo declara 37_ddl_nov_info_basica.sql. Esta
+  --   linea casteaba a 100 y era una incoherencia NUESTRA, no de EDF: una
+  --   descripcion de catalogo de mas de 30 caracteres habria dado el mismo
+  --   XX000 que el nombre completo, sin que EDF tuviera nada que ver.
+  CAST(hti.descripcion AS VARCHAR(30))                            AS tipo_identificacion,
   CASE WHEN bid.personidnumber ~ '^[0-9]+$'
        THEN CAST(bid.personidnumber AS BIGINT)
        ELSE NULL
@@ -775,8 +795,8 @@ SELECT
   CASE WHEN NULLIF(TRIM(bid.businessidstatus), '') IS NULL THEN NULL
        ELSE LPAD(TRIM(bid.businessidstatus), 2, '0')
   END                                                             AS estado_documento,
-  NULLIF(TRIM(xpm."bestpersonalinformation.agerange"::VARCHAR), '') AS rango_edad,
-  NULLIF(TRIM(bid.issuingcityname), '')                           AS lugar_expedicion,
+  CAST(NULLIF(TRIM(xpm."bestpersonalinformation.agerange"::VARCHAR), '') AS VARCHAR(25)) AS rango_edad,
+  CAST(NULLIF(TRIM(bid.issuingcityname), '') AS VARCHAR(100))     AS lugar_expedicion,
   CASE WHEN NULLIF(TRIM(bid.issuedate::VARCHAR), '') ~ '^[0-9]+$'
        THEN bdm_datos.convert_epoch_to_date(
               CAST(NULLIF(TRIM(bid.issuedate::VARCHAR), '') AS BIGINT))
@@ -801,8 +821,8 @@ SELECT
        WHEN NULLIF(TRIM(xpm."bestpersonalinformation.gender"::VARCHAR), '') = '3' THEN CAST('O' AS VARCHAR(1))
        ELSE CAST('' AS VARCHAR(1))
   END                                                             AS genero,
-  NULLIF(TRIM(xpm."bestpersonalinformation.mainisiccodeforproduct"::VARCHAR), '') AS ciiu,
-  NULLIF(TRIM(xpm."bestpersonalinformation.productmainisicdescription"::VARCHAR), '') AS actividad_economica,
+  CAST(NULLIF(TRIM(xpm."bestpersonalinformation.mainisiccodeforproduct"::VARCHAR), '') AS VARCHAR(20)) AS ciiu,
+  CAST(NULLIF(TRIM(xpm."bestpersonalinformation.productmainisicdescription"::VARCHAR), '') AS VARCHAR(500)) AS actividad_economica,
   -- RAZON SOCIAL: el legado la trae de una columna propia de VU_PERSONA. En
   -- EDF no hay campo aparte -- el nombre completo de una persona juridica ES
   -- su razon social --, de modo que se deriva: fullname cuando el tipo de
@@ -810,15 +830,15 @@ SELECT
   -- eso queda escrita; el riesgo es que un NIT con fullname vacio salga NULL
   -- donde el legado traeria la razon social.
   CASE WHEN CAST(bid.personidtype AS VARCHAR(20)) = '2'
-       THEN NULLIF(TRIM(xpm."bestname.fullname"::VARCHAR), '')
+       THEN CAST(NULLIF(TRIM(xpm."bestname.fullname"::VARCHAR), '') AS VARCHAR(500))
        ELSE NULL
   END                                                             AS razon_social,
   -- NO EXISTE EN EDF: el campo WebSite del contrato Alpha esta marcado
   -- "NO APLICA (NO EXISTE CAMPO EN ALPHA)" (Confluence CCBR 251264543).
-  CAST(NULL AS VARCHAR(200))                                      AS pagina_web,
+  CAST(NULL AS VARCHAR(100))                                      AS pagina_web,
   -- Mosaic fuera por decision legal (D-NOV-07).
   CAST(NULL AS INTEGER)                                           AS mosaic_id,
-  NULLIF(TRIM(bid.issuingstatename), '')                          AS departamento_expedicion,
+  CAST(NULLIF(TRIM(bid.issuingstatename), '') AS VARCHAR(100))    AS departamento_expedicion,
   -- RUT: el legado marca 'S' cuando la persona existe en VU_PERSONA con
   -- COD_DW_FTE_DATO = 2 (Novedad.sql:3478-3483). En EDF el equivalente
   -- declarado es el indicador de registro tributario del ciudadano.
