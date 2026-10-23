@@ -863,6 +863,23 @@ SELECT
        ELSE CAST('N' AS VARCHAR(1))
   END                                                             AS rut
 FROM ds_dba_rncr_batch.edf_views.xpm xpm
+-- EL UNIVERSO SON LAS PERSONAS CON UBICACION, NO TODO EL BURO (job #484).
+-- Sin este join la vista arranca de xpm entero y devolvia 1.194.682 personas
+-- contra las 55.259 de los otros tres dominios de Novedades -- veinte veces
+-- mas --, y de ellas solo ~120.000 traian nombre o documento: mas de un millon
+-- de filas con un id y poco mas.
+--   EL LEGADO NO HACE ESO. Su universo de Info_Basica sale de la RPU, no de la
+--   tabla de personas: TMP_FLAG_OP_I_INBAS se construye
+--   "FROM <BDDATOS>.RELACION_PERSONA_UBICACION RPU" (Novedad.sql:2266-2267).
+--   Era una divergencia nuestra, no un limite del dato (regla 4).
+--   El espejo mock YA lo hacia bien -- v_mock_persona_basica arranca de
+--   v_mock_relacion_persona_ubicacion --, de modo que la bateria no lo veia.
+-- VA COMO JOIN CONTRA UN "SELECT DISTINCT" Y NO COMO "EXISTS" CORRELACIONADO:
+-- Redshift rechaza el EXISTS correlacionado contra una vista del datashare
+-- (XX000, jobs #458 y #477). El DISTINCT conserva una fila por persona.
+INNER JOIN ( SELECT DISTINCT rpu.id_buro_persona
+               FROM bdm_tempo.v_xpm_relacion_persona_ubicacion rpu ) uni
+  ON uni.id_buro_persona = FNV_HASH(xpm.pin)
 -- UNA identificacion por persona. El ranking va en subconsulta: un join
 -- directo a xpm_bestidentifications multiplica la fila de la persona por
 -- cuantos documentos tenga.
