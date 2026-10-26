@@ -151,8 +151,8 @@ FROM (
   SELECT 'PROD', 'delimiter',            '|'                                                                            UNION ALL
   SELECT 'PROD', 'compression',          'GZIP'                                                                         UNION ALL
   SELECT 'PROD', 'null_string',          '\N'                                                                           UNION ALL
-  SELECT 'PROD', 'bucket',               'rcncr-batch-geo-prod-696708350333'                                            UNION ALL
-  SELECT 'PROD', 'iam_role',             'arn:aws:iam::696708350333:role/rcncr-batch-redshift-geo'                      UNION ALL
+  SELECT 'PROD', 'bucket',               'prod-696708350333-rcncr-ws5-geo'                                            UNION ALL
+  SELECT 'PROD', 'iam_role',             'arn:aws:iam::696708350333:role/BURoleFor-prod-696708350333-rcncr-ws5-redshift-geo'                      UNION ALL
   SELECT 'PROD', 'arcgis_account_id',    '696708350333'                                                                 UNION ALL
   SELECT 'PROD', 'max_retries',          '3'                                                                            UNION ALL
   SELECT 'PROD', 'retry_backoff_seconds','300'                                                                          UNION ALL
@@ -164,8 +164,8 @@ FROM (
   SELECT 'UAT',  'delimiter',            '|'                                                                            UNION ALL
   SELECT 'UAT',  'compression',          'GZIP'                                                                         UNION ALL
   SELECT 'UAT',  'null_string',          '\N'                                                                           UNION ALL
-  SELECT 'UAT',  'bucket',               'rcncr-batch-geo-uat-453645298399'                                             UNION ALL
-  SELECT 'UAT',  'iam_role',             'arn:aws:iam::453645298399:role/rcncr-batch-redshift-geo'                      UNION ALL
+  SELECT 'UAT',  'bucket',               'uat-453645298399-rcncr-ws5-geo'                                             UNION ALL
+  SELECT 'UAT',  'iam_role',             'arn:aws:iam::453645298399:role/BURoleFor-uat-453645298399-rcncr-ws5-redshift-geo'                      UNION ALL
   SELECT 'UAT',  'arcgis_account_id',    '453645298399'                                                                 UNION ALL
   SELECT 'UAT',  'max_retries',          '3'                                                                            UNION ALL
   SELECT 'UAT',  'retry_backoff_seconds','300'                                                                          UNION ALL
@@ -177,8 +177,8 @@ FROM (
   SELECT 'TEST', 'delimiter',            '|'                                                                            UNION ALL
   SELECT 'TEST', 'compression',          'GZIP'                                                                         UNION ALL
   SELECT 'TEST', 'null_string',          '\N'                                                                           UNION ALL
-  SELECT 'TEST', 'bucket',               'rcncr-batch-geo-test-667397050561'                                            UNION ALL
-  SELECT 'TEST', 'iam_role',             'arn:aws:iam::667397050561:role/rcncr-batch-redshift-geo'                      UNION ALL
+  SELECT 'TEST', 'bucket',               'test-667397050561-rcncr-ws5-geo'                                            UNION ALL
+  SELECT 'TEST', 'iam_role',             'arn:aws:iam::667397050561:role/BURoleFor-test-667397050561-rcncr-ws5-redshift-geo'                      UNION ALL
   SELECT 'TEST', 'arcgis_account_id',    '667397050561'                                                                 UNION ALL
   SELECT 'TEST', 'max_retries',          '3'                                                                            UNION ALL
   SELECT 'TEST', 'retry_backoff_seconds','300'                                                                          UNION ALL
@@ -190,13 +190,51 @@ FROM (
   SELECT 'DEV',  'delimiter',            '|'                                                                            UNION ALL
   SELECT 'DEV',  'compression',          'GZIP'                                                                         UNION ALL
   SELECT 'DEV',  'null_string',          '\N'                                                                           UNION ALL
-  SELECT 'DEV',  'bucket',               'rcncr-batch-geo-dev-647096294147'                                             UNION ALL
-  SELECT 'DEV',  'iam_role',             'arn:aws:iam::647096294147:role/rcncr-batch-redshift-geo'                      UNION ALL
+  SELECT 'DEV',  'bucket',               'dev-647096294147-rcncr-ws5-geo'                                             UNION ALL
+  SELECT 'DEV',  'iam_role',             'arn:aws:iam::647096294147:role/BURoleFor-dev-647096294147-rcncr-ws5-redshift-geo'                      UNION ALL
   SELECT 'DEV',  'arcgis_account_id',    '647096294147'                                                                 UNION ALL
   SELECT 'DEV',  'max_retries',          '3'                                                                            UNION ALL
   SELECT 'DEV',  'retry_backoff_seconds','300'
 ) v
 WHERE NOT EXISTS (SELECT 1 FROM bdm_datos.geo_config LIMIT 1);
+
+-- ------------------------------------------------------------
+-- RECONCILIACION DE bucket / iam_role (SLCOPRBA-1355, 2026-10-27).
+--
+-- POR QUE HACE FALTA, Y NO BASTA CON CAMBIAR EL INSERT DE ARRIBA: ese INSERT
+-- lleva WHERE NOT EXISTS (... LIMIT 1), de modo que siembra SOLO si la tabla
+-- esta vacia. En un ambiente que ya la tiene poblada -- DEV hoy -- cambiar el
+-- literal del INSERT no cambia nada: el valor viejo sobrevive para siempre.
+-- Es el mismo patron que ya se pago con CREATE TABLE IF NOT EXISTS y el ancho
+-- de mat_info_basica: funciona en limpio y falla donde ya hay datos.
+--
+-- Los nombres pasan a la convencion de la cuenta
+-- (<env>-<cuenta>-rcncr-ws5-geo y BURoleFor-<env>-<cuenta>-rcncr-ws5-redshift-geo),
+-- que es la que usa la infraestructura desplegada por IaC. Antes llevaban un
+-- literal nuestro (rcncr-batch-geo-*) que no existia en ninguna cuenta.
+--
+-- Es idempotente: re-ejecutarlo deja los mismos valores. WHERE explicito y
+-- acotado por ambiente y parametro [REDSHIFT:232].
+-- ------------------------------------------------------------
+UPDATE bdm_datos.geo_config SET valor = 'prod-696708350333-rcncr-ws5-geo'
+ WHERE ambiente = 'PROD' AND parametro = 'bucket';
+UPDATE bdm_datos.geo_config SET valor = 'arn:aws:iam::696708350333:role/BURoleFor-prod-696708350333-rcncr-ws5-redshift-geo'
+ WHERE ambiente = 'PROD' AND parametro = 'iam_role';
+
+UPDATE bdm_datos.geo_config SET valor = 'uat-453645298399-rcncr-ws5-geo'
+ WHERE ambiente = 'UAT' AND parametro = 'bucket';
+UPDATE bdm_datos.geo_config SET valor = 'arn:aws:iam::453645298399:role/BURoleFor-uat-453645298399-rcncr-ws5-redshift-geo'
+ WHERE ambiente = 'UAT' AND parametro = 'iam_role';
+
+UPDATE bdm_datos.geo_config SET valor = 'test-667397050561-rcncr-ws5-geo'
+ WHERE ambiente = 'TEST' AND parametro = 'bucket';
+UPDATE bdm_datos.geo_config SET valor = 'arn:aws:iam::667397050561:role/BURoleFor-test-667397050561-rcncr-ws5-redshift-geo'
+ WHERE ambiente = 'TEST' AND parametro = 'iam_role';
+
+UPDATE bdm_datos.geo_config SET valor = 'dev-647096294147-rcncr-ws5-geo'
+ WHERE ambiente = 'DEV' AND parametro = 'bucket';
+UPDATE bdm_datos.geo_config SET valor = 'arn:aws:iam::647096294147:role/BURoleFor-dev-647096294147-rcncr-ws5-redshift-geo'
+ WHERE ambiente = 'DEV' AND parametro = 'iam_role';
 
 -- ------------------------------------------------------------
 -- 2026-10-20 (GEO no bloqueante): dos parametros nuevos.
