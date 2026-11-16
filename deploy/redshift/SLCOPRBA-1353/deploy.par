@@ -12,6 +12,8 @@
 11b_ddl_unif_control_mock.sql
 11c_ddl_unif_escenario_censo.sql
 11d_ddl_unif_escenario_censo_mock.sql
+11e_ddl_unif_alcance_censo.sql
+11f_ddl_unif_alcance_censo_mock.sql
 13_ddl_cert_criterios.sql
 01_ddl_ordenamiento.sql
 02_catalogos_ordenamiento.sql
