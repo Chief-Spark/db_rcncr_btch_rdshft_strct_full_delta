@@ -83,7 +83,7 @@ SELECT
   ) AS texto_ubicacion_vinculo,
   CASE
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') ~ '^[0-9]+$'
-     AND CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') AS BIGINT) <= 2147483647
+     AND LEN(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '')) <= 9
     THEN CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') AS INTEGER)
     ELSE NULL
   END AS cod_dane_ciudad,
@@ -108,13 +108,13 @@ SELECT
   COALESCE(
     CASE
       WHEN NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') ~ '^[0-9]+$'
-       AND CAST(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') AS BIGINT) <= 2147483647
+       AND LEN(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '')) <= 9
       THEN CAST(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') AS INTEGER)
       ELSE NULL
     END,
     CASE
       WHEN cp.counterpartyidnumber ~ '^[0-9]+$'
-       AND CAST(cp.counterpartyidnumber AS BIGINT) <= 2147483647
+       AND LEN(cp.counterpartyidnumber) <= 9
       THEN CAST(cp.counterpartyidnumber AS INTEGER)
       ELSE NULL
     END

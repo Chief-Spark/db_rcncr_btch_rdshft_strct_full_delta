@@ -93,12 +93,20 @@ SELECT
   CASE
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '8' THEN 5
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') = '7' THEN 4
-    -- SLCOPRBA-1354: tope de magnitud, como ya lo tenian standardizeddanecode
-    -- y counterpartyidnumber en este mismo archivo. Sin el, un contacttype de
-    -- mas de 10 digitos aborta el lote completo con "Value out of range for 4
-    -- bytes"; con el, esa fila queda con tipo NULL y el lote sigue.
+    -- SLCOPRBA-1354: tope de magnitud. Sin el, un contacttype de mas de 10
+    -- digitos aborta el lote completo con "Value out of range for 4 bytes";
+    -- con el, esa fila queda con tipo NULL y el lote sigue.
+    -- D-DEMO-01 (2026-11-18): EL TOPE SE MIDE POR LONGITUD Y NO POR RANGO, y
+    -- la diferencia no es de estilo. Estas doce guardas del paquete casteaban
+    -- a BIGINT para comparar contra 2147483647, de modo que la propia guarda
+    -- reventaba con un texto de 19 digitos o mas:
+    --   Overflow (Long valid range -9223372036854775808 to 9223372036854775807)
+    -- Asi cayo la Regla 3 en DEMO. LEN no puede desbordar, y con <= 9 el
+    -- maximo es 999.999.999, que cabe siempre en INTEGER. Es la forma que ya
+    -- usaba citycode mas abajo en este mismo archivo, y la unica de las doce
+    -- aguantaba. El chequeo 12 de validar.sh impide que vuelva la otra.
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') ~ '^[0-9]+$'
-     AND CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') AS BIGINT) <= 2147483647
+     AND LEN(NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '')) <= 9
     THEN CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.contacttype"::VARCHAR), '') AS INTEGER)
     ELSE NULL
   END AS cod_dw_tipo_ubicacion_dir,
@@ -137,7 +145,7 @@ SELECT
   END AS VARCHAR(20)) AS descripcion_gestion_registro,
   CASE
     WHEN NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') ~ '^[0-9]+$'
-     AND CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') AS BIGINT) <= 2147483647
+     AND LEN(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '')) <= 9
     THEN CAST(NULLIF(TRIM(ci."location.val.contactinformations.val.standardizeddanecode"::VARCHAR), '') AS INTEGER)
     -- 2026-10-20 (D-EDF-02, propuesta C aprobada): CIUDAD DE RESPALDO cuando
     -- no hay DANE. Antes caia a un hash de cityname, que inventaba una ciudad
@@ -519,13 +527,13 @@ SELECT
   COALESCE(
     CASE
       WHEN NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') ~ '^[0-9]+$'
-       AND CAST(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') AS BIGINT) <= 2147483647
+       AND LEN(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '')) <= 9
       THEN CAST(NULLIF(TRIM(loc."location.val.counterpartyidnumber"::VARCHAR), '') AS INTEGER)
       ELSE NULL
     END,
     CASE
       WHEN cp.counterpartyidnumber ~ '^[0-9]+$'
-       AND CAST(cp.counterpartyidnumber AS BIGINT) <= 2147483647
+       AND LEN(cp.counterpartyidnumber) <= 9
       THEN CAST(cp.counterpartyidnumber AS INTEGER)
       ELSE NULL
     END
