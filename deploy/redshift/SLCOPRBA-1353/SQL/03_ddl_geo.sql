@@ -164,8 +164,8 @@ FROM (
   SELECT 'UAT',  'delimiter',            '|'                                                                            UNION ALL
   SELECT 'UAT',  'compression',          'GZIP'                                                                         UNION ALL
   SELECT 'UAT',  'null_string',          '\N'                                                                           UNION ALL
-  SELECT 'UAT',  'bucket',               'uat-453645298399-rcncr-ws5-geo'                                             UNION ALL
-  SELECT 'UAT',  'iam_role',             'arn:aws:iam::453645298399:role/BURoleFor-uat-453645298399-rcncr-ws5-redshift-geo'                      UNION ALL
+  SELECT 'UAT',  'bucket',               'stg-453645298399-rcncr-ws5-geo'                                             UNION ALL
+  SELECT 'UAT',  'iam_role',             'arn:aws:iam::453645298399:role/BURoleFor-stg-453645298399-rcncr-ws5-redshift-geo'                      UNION ALL
   SELECT 'UAT',  'arcgis_account_id',    '453645298399'                                                                 UNION ALL
   SELECT 'UAT',  'max_retries',          '3'                                                                            UNION ALL
   SELECT 'UAT',  'retry_backoff_seconds','300'                                                                          UNION ALL
@@ -221,9 +221,16 @@ UPDATE bdm_datos.geo_config SET valor = 'prod-696708350333-rcncr-ws5-geo'
 UPDATE bdm_datos.geo_config SET valor = 'arn:aws:iam::696708350333:role/BURoleFor-prod-696708350333-rcncr-ws5-redshift-geo'
  WHERE ambiente = 'PROD' AND parametro = 'iam_role';
 
-UPDATE bdm_datos.geo_config SET valor = 'uat-453645298399-rcncr-ws5-geo'
+-- MEDIDO 2026-11-24, job DEMO/TERRAFORM del repo TF_RCNCR_WS5_INFRA (rama demo,
+-- PR #4): el apply creo el par GEO de esta cuenta con el token 'stg', NO 'uat'
+-- ni 'demo'. Salida literal del Terraform:
+--   geo_bucket_name       = "stg-453645298399-rcncr-ws5-geo"
+--   geo_redshift_role_arn = "arn:...:role/BURoleFor-stg-453645298399-rcncr-ws5-redshift-geo"
+-- La etiqueta del ambiente ('UAT') se deja: es solo la llave con la que el SP
+-- agrupa los once parametros, y cambiarla obligaria a mover las once filas.
+UPDATE bdm_datos.geo_config SET valor = 'stg-453645298399-rcncr-ws5-geo'
  WHERE ambiente = 'UAT' AND parametro = 'bucket';
-UPDATE bdm_datos.geo_config SET valor = 'arn:aws:iam::453645298399:role/BURoleFor-uat-453645298399-rcncr-ws5-redshift-geo'
+UPDATE bdm_datos.geo_config SET valor = 'arn:aws:iam::453645298399:role/BURoleFor-stg-453645298399-rcncr-ws5-redshift-geo'
  WHERE ambiente = 'UAT' AND parametro = 'iam_role';
 
 UPDATE bdm_datos.geo_config SET valor = 'test-667397050561-rcncr-ws5-geo'
