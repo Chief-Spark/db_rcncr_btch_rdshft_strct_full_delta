@@ -66,13 +66,15 @@ SELECT * FROM bdm_tempo.v_rpu_post_unificacion
 WITH NO SCHEMA BINDING;
 
 -- Eliminar materializaciones previas (tabla o vista legacy).
--- Importante: DROP TABLE primero. Si el objeto es TABLE, DROP VIEW falla con 42809
--- ("is not a view") y aborta el script Jenkins (REDSHIFT:112).
+-- OJO: IF EXISTS NO protege del tipo equivocado. Es simetrico y muerde en las dos
+-- direcciones: DROP TABLE sobre una VISTA da 42809 "is not a table", igual que
+-- DROP VIEW sobre una TABLA. Medido 2026-11-24 (despliegue manual DEMO, Neil).
+-- Los cuatro insumo_* ya NO se declaran como TABLA en ningun archivo del paquete
+-- (salieron en el commit de las siete tablas muertas, 1.219 -> 1.157), de modo que
+-- su DROP TABLE solo podia acertar en DEV/QA, donde quedan de una version anterior,
+-- y FALLA en todo ambiente donde ya existan como VISTA: o sea, en la segunda
+-- corrida de cualquier ambiente limpio. Se quedan solo los DROP VIEW.
 DROP TABLE IF EXISTS bdm_datos.relacion_persona_ubicacion;
-DROP TABLE IF EXISTS bdm_datos.insumo_direccion;
-DROP TABLE IF EXISTS bdm_datos.insumo_telefono;
-DROP TABLE IF EXISTS bdm_datos.insumo_celular;
-DROP TABLE IF EXISTS bdm_datos.insumo_email;
 DROP VIEW IF EXISTS bdm_datos.insumo_direccion;
 DROP VIEW IF EXISTS bdm_datos.insumo_telefono;
 DROP VIEW IF EXISTS bdm_datos.insumo_celular;
