@@ -145,14 +145,20 @@ INSERT INTO bdm_datos.geo_config (ambiente, parametro, valor)
 SELECT v.ambiente, v.parametro, v.valor
 FROM (
   -- PROD (cuenta 696708350333)
+  -- OJO AL TOKEN: la cuenta lleva CUATRO etiquetas y la que manda es la cuarta.
+  -- Jenkins la llama PROD, su alias de AWS es ...-reconocermaster-prod, su tag
+  -- Environment es 'prd' y lo que la IaC CREA lleva 'pro'. MEDIDO en la salida
+  -- del apply de COAWSPPR/TF_RCNCR_WS5_INFRA, PROD/TERRAFORM (2026-11-25,
+  -- 10 added): geo_bucket_name = pro-696708350333-rcncr-ws5-geo.
+  -- Aqui decia 'prod' en los dos y ninguno de esos objetos existe.
   SELECT 'PROD' AS ambiente, 'max_records'           AS parametro, '850000'                                   AS valor UNION ALL
   SELECT 'PROD', 'maxfilesize_mb',       '128'                                                                          UNION ALL
   SELECT 'PROD', 's3_prefix',            'reconocer_input/'                                                             UNION ALL
   SELECT 'PROD', 'delimiter',            '|'                                                                            UNION ALL
   SELECT 'PROD', 'compression',          'GZIP'                                                                         UNION ALL
   SELECT 'PROD', 'null_string',          '\N'                                                                           UNION ALL
-  SELECT 'PROD', 'bucket',               'prod-696708350333-rcncr-ws5-geo'                                            UNION ALL
-  SELECT 'PROD', 'iam_role',             'arn:aws:iam::696708350333:role/BURoleFor-prod-696708350333-rcncr-ws5-redshift-geo'                      UNION ALL
+  SELECT 'PROD', 'bucket',               'pro-696708350333-rcncr-ws5-geo'                                             UNION ALL
+  SELECT 'PROD', 'iam_role',             'arn:aws:iam::696708350333:role/BURoleFor-pro-696708350333-rcncr-ws5-redshift-geo'                       UNION ALL
   SELECT 'PROD', 'arcgis_account_id',    '696708350333'                                                                 UNION ALL
   SELECT 'PROD', 'max_retries',          '3'                                                                            UNION ALL
   SELECT 'PROD', 'retry_backoff_seconds','300'                                                                          UNION ALL
@@ -216,9 +222,9 @@ WHERE NOT EXISTS (SELECT 1 FROM bdm_datos.geo_config LIMIT 1);
 -- Es idempotente: re-ejecutarlo deja los mismos valores. WHERE explicito y
 -- acotado por ambiente y parametro [REDSHIFT:232].
 -- ------------------------------------------------------------
-UPDATE bdm_datos.geo_config SET valor = 'prod-696708350333-rcncr-ws5-geo'
+UPDATE bdm_datos.geo_config SET valor = 'pro-696708350333-rcncr-ws5-geo' 
  WHERE ambiente = 'PROD' AND parametro = 'bucket';
-UPDATE bdm_datos.geo_config SET valor = 'arn:aws:iam::696708350333:role/BURoleFor-prod-696708350333-rcncr-ws5-redshift-geo'
+UPDATE bdm_datos.geo_config SET valor = 'arn:aws:iam::696708350333:role/BURoleFor-pro-696708350333-rcncr-ws5-redshift-geo' 
  WHERE ambiente = 'PROD' AND parametro = 'iam_role';
 
 -- MEDIDO 2026-11-24, job DEMO/TERRAFORM del repo TF_RCNCR_WS5_INFRA (rama demo,
